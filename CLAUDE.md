@@ -37,7 +37,7 @@ npm run webhook:send      # send a signed Shopify webhook to localhost
 - `lib/agent/` — `tools.ts`, `prompt.ts`, `run.ts`
 - `lib/session.ts` — Data Access Layer: `requireUser()`; `proxy.ts` is only an optimistic cookie check
 - `app/(app)/` — authenticated pages; `app/login/`
-- `docs/` — architecture, ADRs, Shopify setup, deploy, agent
+- `docs/{en,pt-BR,it}/` — architecture, ADRs, Shopify setup, deploy, agent, **limitations**
 
 ## Invariants (do not break)
 
@@ -55,6 +55,11 @@ npm run webhook:send      # send a signed Shopify webhook to localhost
    Vitest aliases `server-only` to a stub.
 
 ## Working agreements
+
+- **Documentation is trilingual: English, Portuguese (pt-BR), Italian.** `README.md` (en),
+  `README.pt-BR.md`, `README.it.md` and `docs/{en,pt-BR,it}/` have the same files and the same
+  content. Any doc change updates all three in the same commit. Every known limitation or
+  trade-off goes into `docs/*/limitations.md` in all three languages (same item ids: F1, R2, …).
 
 - Use the project skills: `shopify-webhook-topic`, `prisma-migration`, `agent-tool`,
   `ship-feature`, `br-ecommerce-integrations` (+ Prisma's `prisma-client-api`, `prisma-cli`).

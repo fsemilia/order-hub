@@ -13,7 +13,9 @@ description: Take an Order Hub change from a clean branch to a reviewed pull req
    - `npm run format:check`
    - `npm run test:integration` — if DB, webhooks or queries changed (needs `npm run db:test:start`)
    - `npm run test:e2e` — if UI or auth changed (needs a seeded DB and `npm run dev`)
-4. **Docs**: README / `docs/` / ADR updated when behavior, setup or a decision changed.
+4. **Docs (trilingual)**: when behavior, setup or a decision changed, update the docs in
+   **English, Portuguese and Italian** (`README*.md`, `docs/{en,pt-BR,it}/`). New limitation or
+   trade-off → add it to `docs/*/limitations.md` in all three languages with the next free id.
 5. **Commit** with Conventional Commits, imperative, scope optional:
    `feat(webhooks): handle refunds/create`, `fix(crm): exclude voided orders from LTV`.
    One logical change per commit. Never commit `.env*` (except `.env.example`).

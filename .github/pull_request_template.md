@@ -14,4 +14,5 @@
 - [ ] Webhooks: HMAC no raw body, idempotência e transação preservados
 - [ ] Nenhum dado pessoal novo enviado ao LLM (LGPD)
 - [ ] Migração Prisma nova é aditiva / tem plano de rollback
+- [ ] Documentação atualizada em EN, PT-BR e IT (incluindo `limitations.md`, se aplicável)
 - [ ] Código gerado por IA revisado linha a linha
