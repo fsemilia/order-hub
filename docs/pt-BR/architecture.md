@@ -1,5 +1,7 @@
 # Arquitetura
 
+🌐 [English](../en/architecture.md) · **Português** · [Italiano](../it/architecture.md)
+
 ## Visão geral
 
 Um único app Next.js (monólito modular) implantado na Vercel, com PostgreSQL gerenciado
@@ -39,6 +41,9 @@ Equipe ────▶ │ proxy.ts → app/(app)/* → lib/crm/queries    │  
 | Falha no meio do processamento            | transação: ou tudo, ou nada                                       |
 | Pedido sem cliente (checkout convidado)   | pedido gravado com `customerId = null`                            |
 | Pedido de exclusão (LGPD)                 | `customers/redact` anonimiza e impede reidratação de PII          |
+
+Os limites dessas garantias (ex.: entregas concorrentes do mesmo pedido, processamento síncrono)
+estão em [`limitations.md`](limitations.md), itens R1–R2.
 
 ## Modelo de dados
 

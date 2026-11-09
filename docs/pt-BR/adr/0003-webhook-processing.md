@@ -1,5 +1,7 @@
 # 0003 — Processamento síncrono e idempotente de webhooks
 
+🌐 [English](../../en/adr/0003-webhook-processing.md) · **Português** · [Italiano](../../it/adr/0003-webhook-processing.md)
+
 - **Status:** aceita
 - **Data:** 2026-11-09
 
@@ -26,3 +28,4 @@ Eventos com `updated_at` mais antigo que o gravado são ignorados.
 - (+) Simples, testável de ponta a ponta (`tests/integration/shopify-webhook.test.ts`).
 - (−) Gatilho para revisar: p95 do webhook > 1 s ou picos acima de algumas dezenas por segundo.
   A migração é local: `handleShopifyWebhook` vira o consumidor da fila.
+- (−) Limites conhecidos: ver [limitations.md](../limitations.md), itens R1–R2.

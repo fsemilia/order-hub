@@ -1,5 +1,7 @@
 # Deploy: Supabase + Vercel
 
+🌐 [English](../en/deploy.md) · **Português** · [Italiano](../it/deploy.md)
+
 ## 1. Banco (Supabase)
 
 1. Crie um projeto em https://supabase.com, região **South America (São Paulo)** — a mesma da
@@ -43,7 +45,8 @@ DATABASE_URL="<DIRECT_URL do Supabase>" DATABASE_POOL_MAX=5 npm run db:seed
 - `GET /api/health` → `{"status":"ok","db":"up"}`
 - Configure o webhook da Shopify para `https://<projeto>.vercel.app/api/webhooks/shopify`
 - Cada Pull Request ganha um **Preview Deployment**. Para previews isoladas do banco de produção,
-  use um branch do Supabase ou um banco de staging nas variáveis de _Preview_.
+  use um branch do Supabase ou um banco de staging nas variáveis de _Preview_ (ver
+  [`limitations.md`](limitations.md), item A4).
 
 ## Rollback
 

@@ -1,5 +1,7 @@
 # 0002 — Prisma 7 + PostgreSQL, dinheiro em Decimal, agregados desnormalizados
 
+🌐 [English](../../en/adr/0002-prisma-postgres-money.md) · **Português** · [Italiano](../../it/adr/0002-prisma-postgres-money.md)
+
 - **Status:** aceita
 - **Data:** 2026-11-09
 

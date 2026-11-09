@@ -1,5 +1,7 @@
 # Order Hub
 
+🌐 [English](README.md) · **Português** · [Italiano](README.it.md)
+
 **Shopify → CRM com agente de IA de retenção.** Recebe os pedidos de uma loja Shopify via
 webhooks, grava em PostgreSQL com Prisma, calcula as métricas de CRM de cada cliente (LTV,
 ticket médio, segmento _novo / recorrente / em risco_) e oferece um agente de IA que responde
@@ -24,7 +26,7 @@ banco por _tool calling_, sempre entregando rascunhos para revisão humana.
 | **Webhooks Shopify** | `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`, `customers/create`, `customers/update`, `customers/redact`. Verificação HMAC no corpo bruto, idempotência por `X-Shopify-Webhook-Id`, transação única, descarte de eventos fora de ordem. |
 | **CRM**              | LTV e ticket médio por cliente (usando `current_total_price`, que já reflete reembolsos), segmentação novo / recorrente / em risco / sem compras, filtros e busca server-side.                                                                                  |
 | **Painel**           | Faturamento 30/90 dias, ticket médio, distribuição por segmento, produtos mais vendidos.                                                                                                                                                                        |
-| **Agente de IA**     | Claude com 3 ferramentas somente leitura, minimização de dados pessoais, limite diário por usuário, auditoria de tokens e ferramentas em `agent_runs`.                                                                                                          |
+| **Agente de IA**     | Claude com 3 ferramentas somente leitura, minimização de dados pessoais, cota por usuário, auditoria de tokens e ferramentas em `agent_runs`.                                                                                                                   |
 | **Autenticação**     | Better Auth: e-mail/senha sem cadastro público + GitHub OAuth opcional com allowlist; rate limit no login.                                                                                                                                                      |
 | **LGPD**             | `customers/redact` anonimiza o cliente e mantém só o histórico financeiro anônimo; o LLM nunca recebe e-mail/telefone.                                                                                                                                          |
 
@@ -43,8 +45,8 @@ flowchart LR
     A -- "rascunho" --> U
 ```
 
-Detalhes em [`docs/architecture.md`](docs/architecture.md) e nas decisões registradas em
-[`docs/adr/`](docs/adr).
+Detalhes em [`docs/pt-BR/architecture.md`](docs/pt-BR/architecture.md) e nas decisões registradas
+em [`docs/pt-BR/adr/`](docs/pt-BR/adr).
 
 ## Stack
 
@@ -84,8 +86,8 @@ npm run webhook:send -- --repeat 2                     # mesmo webhook 2x → {"
 npm run webhook:send -- --topic orders/updated --status refunded
 ```
 
-Para conectar uma loja de desenvolvimento real: [`docs/shopify-setup.md`](docs/shopify-setup.md).
-Para publicar na Vercel com Supabase: [`docs/deploy.md`](docs/deploy.md).
+Para conectar uma loja de desenvolvimento real: [`docs/pt-BR/shopify-setup.md`](docs/pt-BR/shopify-setup.md).
+Para publicar na Vercel com Supabase: [`docs/pt-BR/deploy.md`](docs/pt-BR/deploy.md).
 
 ## Testes
 
@@ -112,6 +114,13 @@ inválido (rollback) e anonimização LGPD.
 - **IA com revisão humana**: o agente não escreve no banco nem envia nada; as respostas são
   rascunhos editáveis, e cada execução fica auditada com tokens, ferramentas e latência.
 
+## Limitações conhecidas
+
+As escolhas conscientes e as lacunas conhecidas (loja única, webhooks síncronos, rate limit por
+instância, dois webhooks de privacidade apenas confirmados, agente sem avaliação automatizada,
+particularidades do `prisma dev` local e outras) estão listadas, cada uma com a sua solução, em
+[`docs/pt-BR/limitations.md`](docs/pt-BR/limitations.md).
+
 ## Estrutura
 
 ```text
@@ -125,7 +134,7 @@ lib/
   agent/            ferramentas, prompt, execução
 prisma/             schema, migrações, seed
 tests/              unit · integration · e2e · fixtures
-docs/               arquitetura, ADRs, setup Shopify, deploy, agente
+docs/               en · pt-BR · it — arquitetura, ADRs, setup Shopify, deploy, agente, limitações
 .claude/            skills, subagente revisor e hooks do Claude Code
 ```
 

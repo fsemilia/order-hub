@@ -1,12 +1,14 @@
 # Agente de retenção
 
+🌐 [English](../en/agent.md) · **Português** · [Italiano](../it/agent.md)
+
 Responde perguntas sobre a base de clientes e escreve rascunhos de mensagens de retenção.
 
 ## Como funciona
 
 ```text
 Pergunta (Server Action, autenticada, Zod)
-  → limite diário por usuário (agent_runs)
+  → cota por usuário nas últimas 24 h (agent_runs)
   → Anthropic SDK tool runner (Claude, effort "medium", máx. 6 iterações)
       ↔ get_store_overview / find_customers / get_customer_profile   (somente leitura)
   → resposta como rascunho editável na tela
@@ -33,7 +35,7 @@ Todas reutilizam `lib/crm/queries.ts`, que tem testes de integração.
 - **Dados da loja são dados**: nomes e títulos de produtos podem conter texto malicioso
   (prompt injection); o prompt instrui o modelo a tratá-los como dados, e as ferramentas não
   permitem nenhuma ação perigosa mesmo que ele obedeça.
-- **Custo controlado**: limite diário (`AGENT_DAILY_LIMIT`), iterações limitadas, prompt estático
+- **Custo controlado**: cota (`AGENT_DAILY_LIMIT` em 24 h móveis), iterações limitadas, prompt estático
   (cacheável) e tokens registrados por execução.
 - **Recusas**: fallback de recusa no servidor (`fallbacks: "default"`) e tratamento de
   `stop_reason: "refusal"` com mensagem clara.
@@ -52,3 +54,8 @@ Todas reutilizam `lib/crm/queries.ts`, que tem testes de integração.
 select created_at, question, input_tokens, output_tokens, duration_ms, error
 from agent_runs order by created_at desc limit 20;
 ```
+
+## Limitações
+
+Sem avaliação automatizada, uma pergunta por vez, cota em janela móvel, prompt injection mitigado
+mas não impossível, dados enviados a terceiros: ver [`limitations.md`](limitations.md), itens G1–G5.

@@ -1,5 +1,7 @@
 # 0005 — Agente de IA somente leitura, com revisão humana
 
+🌐 [English](../../en/adr/0005-ai-agent.md) · **Português** · [Italiano](../../it/adr/0005-ai-agent.md)
+
 - **Status:** aceita
 - **Data:** 2026-11-09
 
@@ -23,3 +25,4 @@ loja e custo.
 - (+) Mesmo um prompt injection bem-sucedido não tem ferramenta perigosa para usar.
 - (+) Custos e comportamento observáveis por execução.
 - (−) Para enviar a campanha, um humano copia o rascunho — intencional nesta fase.
+- (−) Ainda sem avaliação automatizada: ver [limitations.md](../limitations.md), itens G1–G5.

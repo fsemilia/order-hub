@@ -1,5 +1,7 @@
 # 0004 — Better Auth para autenticação
 
+🌐 [English](../../en/adr/0004-better-auth.md) · **Português** · [Italiano](../../it/adr/0004-better-auth.md)
+
 - **Status:** aceita
 - **Data:** 2026-11-09
 
@@ -25,3 +27,4 @@ allowlist (`ALLOWED_EMAILS` via `validateUserInfo`), rate limit no login. Checag
 
 - (+) Sessões no banco (revogação imediata no logout), sem vendor lock-in.
 - (−) Tabelas de auth no nosso schema, versionadas por migração (é o que queremos).
+- (−) Ainda sem redefinição de senha, verificação de e-mail nem papéis: ver [limitations.md](../limitations.md), itens A1–A3.

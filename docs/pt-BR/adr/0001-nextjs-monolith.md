@@ -1,5 +1,7 @@
 # 0001 — Monólito Next.js (App Router) com Cache Components
 
+🌐 [English](../../en/adr/0001-nextjs-monolith.md) · **Português** · [Italiano](../../it/adr/0001-nextjs-monolith.md)
+
 - **Status:** aceita
 - **Data:** 2026-11-09
 

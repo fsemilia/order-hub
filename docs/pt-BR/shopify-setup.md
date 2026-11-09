@@ -1,5 +1,7 @@
 # Conectando uma loja Shopify de desenvolvimento
 
+🌐 [English](../en/shopify-setup.md) · **Português** · [Italiano](../it/shopify-setup.md)
+
 O Order Hub só precisa **receber webhooks**. Há dois caminhos; para a demo, comece pelo A.
 
 > As telas da Shopify mudam com frequência. Se algo abaixo não bater, use o servidor MCP
@@ -32,8 +34,9 @@ Os webhooks precisam de HTTPS público:
 
 ## Caminho B — app (como seria em produção para vários lojistas)
 
-O arquivo [`shopify.app.toml`](../shopify.app.toml) já declara os tópicos, incluindo os
-webhooks obrigatórios de privacidade (`customers/redact`, `customers/data_request`, `shop/redact`).
+O arquivo [`shopify.app.toml`](../../shopify.app.toml) já declara os tópicos, incluindo os
+webhooks obrigatórios de privacidade (`customers/redact`, `customers/data_request`, `shop/redact`). Hoje só
+`customers/redact` é processado; ver [`limitations.md`](limitations.md), item F4.
 
 1. Crie o app no Dev Dashboard (ou `npm i -g @shopify/cli && shopify app init` e escolha "build
    an app without a template"), e copie o `client_id` para o TOML.
