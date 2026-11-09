@@ -6,7 +6,7 @@ ticket médio, segmento _novo / recorrente / em risco_) e oferece um agente de I
 perguntas como _"quais clientes estão em risco? escreva um e-mail de reativação"_ consultando o
 banco por _tool calling_, sempre entregando rascunhos para revisão humana.
 
-[![CI](https://github.com/filipposemilia/order-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/filipposemilia/order-hub/actions/workflows/ci.yml)
+[![CI](https://github.com/fsemilia/order-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/fsemilia/order-hub/actions/workflows/ci.yml)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![Prisma](https://img.shields.io/badge/Prisma-7-2D3748)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
@@ -65,7 +65,7 @@ Detalhes em [`docs/architecture.md`](docs/architecture.md) e nas decisões regis
 Pré-requisitos: Node 22+ e npm. **Não precisa de Docker**: o Postgres local é o `prisma dev`.
 
 ```bash
-git clone https://github.com/filipposemilia/order-hub && cd order-hub
+git clone https://github.com/fsemilia/order-hub && cd order-hub
 npm install
 cp .env.example .env              # gere BETTER_AUTH_SECRET: openssl rand -base64 32
 npm run db:dev                    # sobe o Postgres local (porta 51214)
