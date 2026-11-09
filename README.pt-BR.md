@@ -13,6 +13,8 @@ banco por _tool calling_, sempre entregando rascunhos para revisão humana.
 ![Prisma](https://img.shields.io/badge/Prisma-7-2D3748)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
 
+**Demo ao vivo:** https://order-hub-lime.vercel.app (Vercel `gru1` + Supabase São Paulo, dados de demonstração; credenciais sob pedido).
+
 > Projeto construído para aprofundar Prisma em produção e o ecossistema de webhooks da Shopify,
 > com o mesmo rigor de um sistema real: idempotência, transações, testes automatizados, CI,
 > autenticação e LGPD.

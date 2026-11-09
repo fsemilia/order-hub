@@ -32,6 +32,15 @@
    migrations are applied before the build; if they fail, the deploy fails and the previous
    version stays online.
 
+## TLS to Supabase
+
+Supabase's certificates chain to a private root (Supabase Root 2021 CA) that is not in Node's
+trust store, and `pg` treats `sslmode=require` as full verification against the system CAs, so the
+connection fails with `SELF_SIGNED_CERT_IN_CHAIN`. The fix here is **not** to disable
+verification: `lib/db-adapter.ts` pins the official Supabase root CA for `*.supabase.com` hosts and
+keeps full verification (chain + hostname). Keep `?sslmode=require` in the URLs (Prisma migrations
+use it); the app removes it before connecting. See [`limitations.md`](limitations.md), item R6.
+
 ## 3. Demo data (optional)
 
 For a demo environment, run the seed from your machine against Supabase (the script refuses to

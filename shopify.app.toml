@@ -4,7 +4,7 @@
 
 name = "Order Hub"
 client_id = "REPLACE_WITH_YOUR_CLIENT_ID"
-application_url = "https://order-hub.vercel.app"
+application_url = "https://order-hub-lime.vercel.app"
 embedded = false
 
 [access_scopes]
@@ -24,15 +24,15 @@ api_version = "2026-10"
     "customers/create",
     "customers/update",
   ]
-  uri = "https://order-hub.vercel.app/api/webhooks/shopify"
+  uri = "https://order-hub-lime.vercel.app/api/webhooks/shopify"
 
   # Mandatory privacy (GDPR/LGPD) compliance webhooks
   [[webhooks.subscriptions]]
   compliance_topics = ["customers/redact", "customers/data_request", "shop/redact"]
-  uri = "https://order-hub.vercel.app/api/webhooks/shopify"
+  uri = "https://order-hub-lime.vercel.app/api/webhooks/shopify"
 
 [auth]
-redirect_urls = ["https://order-hub.vercel.app/api/auth/callback"]
+redirect_urls = ["https://order-hub-lime.vercel.app/api/auth/callback"]
 
 [pos]
 embedded = false

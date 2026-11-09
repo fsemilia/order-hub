@@ -13,6 +13,8 @@ calling, always returning drafts for human review.
 ![Prisma](https://img.shields.io/badge/Prisma-7-2D3748)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
 
+**Live demo:** https://order-hub-lime.vercel.app (Vercel `gru1` + Supabase São Paulo, demo data; credentials on request).
+
 > Built to go deep on Prisma in production and on Shopify's webhook ecosystem, with the rigor of
 > a real system: idempotency, transactions, automated tests, CI, authentication and LGPD (Brazil's
 > data protection law).

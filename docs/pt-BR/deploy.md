@@ -31,6 +31,16 @@
    as migrações são aplicadas antes do build; se falharem, o deploy falha e a versão anterior
    continua no ar.
 
+## TLS com a Supabase
+
+Os certificados da Supabase são assinados por uma raiz privada (Supabase Root 2021 CA) que não está
+no trust store do Node, e o `pg` trata `sslmode=require` como verificação completa contra as CAs do
+sistema, então a conexão falha com `SELF_SIGNED_CERT_IN_CHAIN`. A solução aqui **não** é desativar a
+verificação: `lib/db-adapter.ts` fixa a CA raiz oficial da Supabase para hosts `*.supabase.com` e
+mantém a verificação completa (cadeia + hostname). Mantenha `?sslmode=require` nas URLs (as
+migrações do Prisma usam); o app remove o parâmetro antes de conectar. Ver
+[`limitations.md`](limitations.md), item R6.
+
 ## 3. Dados de demonstração (opcional)
 
 Para um ambiente de demo, rode o seed da sua máquina apontando para o Supabase

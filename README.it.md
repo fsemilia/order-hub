@@ -13,6 +13,8 @@ database con il tool calling, restituendo sempre bozze da far revisionare a una 
 ![Prisma](https://img.shields.io/badge/Prisma-7-2D3748)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
 
+**Demo live:** https://order-hub-lime.vercel.app (Vercel `gru1` + Supabase San Paolo, dati demo; credenziali su richiesta).
+
 > Progetto costruito per approfondire Prisma in produzione e l'ecosistema dei webhook Shopify, con
 > il rigore di un sistema reale: idempotenza, transazioni, test automatici, CI, autenticazione e
 > LGPD (la legge brasiliana sulla protezione dei dati).
