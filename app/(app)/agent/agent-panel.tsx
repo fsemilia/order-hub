@@ -55,7 +55,7 @@ export function AgentPanel({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-zinc-500">
-              {Math.max(0, quota)} perguntas restantes hoje
+              {Math.max(0, quota)} perguntas restantes nas últimas 24 h
             </span>
             <button type="submit" disabled={pending || quota <= 0} className={buttonStyles.primary}>
               {pending ? "Analisando…" : "Perguntar"}

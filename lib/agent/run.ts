@@ -45,7 +45,10 @@ export async function runAgent(question: string, userId: string): Promise<AgentR
   if (!isAgentConfigured())
     return { ok: false, error: "Agente não configurado (ANTHROPIC_API_KEY)." };
   if ((await remainingQuota(userId)) <= 0) {
-    return { ok: false, error: "Limite diário de perguntas atingido. Tente amanhã." };
+    return {
+      ok: false,
+      error: "Limite de perguntas das últimas 24 horas atingido. Tente mais tarde.",
+    };
   }
 
   const run = await prisma.agentRun.create({ data: { userId, question } });
