@@ -1,0 +1,36 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# prisma generated client
+/generated
+
+# testing
+/coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# env files (never commit secrets — use .env.example as the template)
+.env*
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# vercel / shopify cli
+.vercel
+.shopify
+
+# claude code: personal settings stay local
+.claude/settings.local.json
+/playwright/.auth/
