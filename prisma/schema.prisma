@@ -1,0 +1,180 @@
+// Order Hub — data model
+// Conventions:
+//   * Money is always Decimal(12,2), never Float.
+//   * Shopify IDs are stored as String (they exceed JS safe integers in some resources).
+//   * Customer aggregates (ordersCount, totalSpent, first/lastOrderAt) are denormalized and
+//     recomputed inside the same transaction that writes an order: see lib/crm/aggregates.ts.
+//   * The segment (novo / recorrente / em_risco) is NOT stored: it depends on "now",
+//     so it is derived at query time from lastOrderAt (lib/crm/segments.ts).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Domain ─────────────────────────────────────────────────────────────────
+
+model Customer {
+  id               String    @id @default(cuid())
+  shopifyId        String    @unique
+  email            String?
+  firstName        String?
+  lastName         String?
+  phone            String?
+  acceptsMarketing Boolean   @default(false)
+  // LGPD: set when Shopify sends customers/redact; PII fields are wiped.
+  redactedAt       DateTime?
+
+  // Denormalized aggregates over paid, non-cancelled orders
+  ordersCount  Int       @default(0)
+  totalSpent   Decimal   @default(0) @db.Decimal(12, 2)
+  firstOrderAt DateTime?
+  lastOrderAt  DateTime?
+
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lastOrderAt])
+  @@index([totalSpent])
+  @@map("customers")
+}
+
+model Order {
+  id                String    @id @default(cuid())
+  shopifyId         String    @unique
+  // Human-readable order name, e.g. "#1001"
+  name              String
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  // current_total_price from Shopify: already reflects refunds and order edits
+  totalPrice        Decimal   @db.Decimal(12, 2)
+  currency          String    @db.Char(3)
+  financialStatus   String
+  fulfillmentStatus String?
+  placedAt          DateTime
+  cancelledAt       DateTime?
+  // updated_at from Shopify: used to drop out-of-order (stale) webhooks
+  shopifyUpdatedAt  DateTime
+
+  lineItems OrderLineItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([customerId, placedAt])
+  @@index([placedAt])
+  @@map("orders")
+}
+
+model OrderLineItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shopifyId String
+  title     String
+  sku       String?
+  quantity  Int
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  @@unique([orderId, shopifyId])
+  @@index([title])
+  @@map("order_line_items")
+}
+
+// Idempotency log: Shopify delivers at-least-once. X-Shopify-Webhook-Id is the primary key,
+// so a duplicate delivery fails with P2002 inside the transaction and is acknowledged with 200.
+model WebhookEvent {
+  id         String   @id
+  topic      String
+  shopDomain String?
+  receivedAt DateTime @default(now())
+
+  @@index([topic, receivedAt])
+  @@map("webhook_events")
+}
+
+// Audit + cost tracking for the AI agent (also used for the per-user daily limit).
+model AgentRun {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question     String
+  answer       String?
+  toolCalls    Json?
+  inputTokens  Int?
+  outputTokens Int?
+  durationMs   Int?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("agent_runs")
+}
+
+// ─── Auth (Better Auth core schema) ─────────────────────────────────────────
+
+model User {
+  id            String     @id
+  name          String
+  email         String     @unique
+  emailVerified Boolean    @default(false)
+  image         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  agentRuns     AgentRun[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
