@@ -9,18 +9,21 @@
  */
 import "dotenv/config";
 import { fakerPT_BR as faker } from "@faker-js/faker";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
 import { PrismaClient } from "../generated/prisma/client";
 import { shopifyOrderSchema } from "../lib/shopify/schemas";
 import { ingestOrder } from "../lib/shopify/ingest";
+import { createPgAdapter } from "../lib/db-adapter";
 
 if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
   throw new Error("Refusing to seed a production database.");
 }
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+  adapter: createPgAdapter(
+    process.env.DATABASE_URL ?? "",
+    Number(process.env.DATABASE_POOL_MAX) || 5,
+  ),
 });
 
 const DAY = 86_400_000;

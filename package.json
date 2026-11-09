@@ -5,7 +5,7 @@
   "description": "Shopify → CRM: webhooks de pedidos, métricas de clientes (LTV, ticket médio, segmentos) e agente de IA de retenção.",
   "license": "MIT",
   "engines": {
-    "node": ">=22.12"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "next dev",

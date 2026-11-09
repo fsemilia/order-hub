@@ -34,3 +34,6 @@ npm-debug.log*
 # claude code: personal settings stay local
 .claude/settings.local.json
 /playwright/.auth/
+
+# supabase cli link metadata
+/supabase/.temp/
