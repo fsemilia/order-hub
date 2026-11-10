@@ -12,6 +12,8 @@ import {
   type Segment,
 } from "./segments";
 
+// Every read model is scoped to ONE store (storeId comes from requireStoreContext()).
+
 const revenueOrder: Prisma.OrderWhereInput = {
   financialStatus: { in: [...REVENUE_STATUSES] },
   cancelledAt: null,
@@ -21,7 +23,9 @@ export const PAGE_SIZE = 25;
 
 export type CustomerRow = {
   id: string;
-  name: string;
+  /** null when the customer has no name; the UI renders a translated placeholder */
+  name: string | null;
+  redacted: boolean;
   email: string | null;
   ordersCount: number;
   ltvCents: number;
@@ -29,15 +33,6 @@ export type CustomerRow = {
   lastOrderAt: Date | null;
   segment: Segment;
 };
-
-function displayName(c: {
-  firstName: string | null;
-  lastName: string | null;
-  redactedAt?: Date | null;
-}) {
-  if (c.redactedAt) return "Cliente anonimizado";
-  return [c.firstName, c.lastName].filter(Boolean).join(" ") || "Sem nome";
-}
 
 function toRow(
   c: {
@@ -56,7 +51,8 @@ function toRow(
   const ltvCents = decimalToCents(c.totalSpent);
   return {
     id: c.id,
-    name: displayName(c),
+    name: [c.firstName, c.lastName].filter(Boolean).join(" ") || null,
+    redacted: Boolean(c.redactedAt),
     email: c.email,
     ordersCount: c.ordersCount,
     ltvCents,
@@ -74,13 +70,18 @@ export type ListCustomersParams = {
   limit?: number;
 };
 
-export async function listCustomers(params: ListCustomersParams, now = new Date()) {
+export async function listCustomers(
+  storeId: string,
+  params: ListCustomersParams,
+  now = new Date(),
+) {
   const riskDays = env().CRM_RISK_DAYS;
   const limit = params.limit ?? PAGE_SIZE;
   const page = Math.max(1, params.page ?? 1);
   const q = params.q?.trim();
 
   const where: Prisma.CustomerWhereInput = {
+    storeId,
     redactedAt: null,
     ...(params.segment ? segmentWhere(params.segment, now, riskDays) : {}),
     ...(q
@@ -115,10 +116,11 @@ export async function listCustomers(params: ListCustomersParams, now = new Date(
   };
 }
 
-export async function getCustomerDetail(id: string, now = new Date()) {
+export async function getCustomerDetail(storeId: string, id: string, now = new Date()) {
   const riskDays = env().CRM_RISK_DAYS;
-  const customer = await prisma.customer.findUnique({
-    where: { id },
+  // storeId in the filter: an id from another store is "not found", never leaked.
+  const customer = await prisma.customer.findFirst({
+    where: { id, storeId },
     include: {
       orders: {
         orderBy: { placedAt: "desc" },
@@ -152,62 +154,101 @@ export async function getCustomerDetail(id: string, now = new Date()) {
 
 export type StoreOverview = Awaited<ReturnType<typeof getStoreOverview>>;
 
-export async function getStoreOverview(now = new Date()) {
+export async function getStoreOverview(storeId: string, now = new Date()) {
   const riskDays = env().CRM_RISK_DAYS;
+  const since7 = new Date(now.getTime() - 7 * DAY_MS);
   const since30 = new Date(now.getTime() - 30 * DAY_MS);
   const since90 = new Date(now.getTime() - 90 * DAY_MS);
+  const revenue = { storeId, ...revenueOrder };
 
-  const [segmentCounts, rev30, rev90, allTime, topProducts, lastWebhook] = await Promise.all([
-    Promise.all(
-      SEGMENTS.map(async (s) => ({
-        segment: s,
-        count: await prisma.customer.count({
-          where: { redactedAt: null, ...segmentWhere(s, now, riskDays) },
-        }),
-      })),
-    ),
-    prisma.order.aggregate({
-      where: { ...revenueOrder, placedAt: { gte: since30 } },
-      _sum: { totalPrice: true },
-      _count: { _all: true },
-    }),
-    prisma.order.aggregate({
-      where: { ...revenueOrder, placedAt: { gte: since90 } },
-      _sum: { totalPrice: true },
-      _count: { _all: true },
-    }),
-    prisma.order.aggregate({
-      where: revenueOrder,
-      _sum: { totalPrice: true },
-      _count: { _all: true },
-    }),
-    prisma.orderLineItem.groupBy({
-      by: ["title"],
-      where: { order: { ...revenueOrder, placedAt: { gte: since90 } } },
-      _sum: { quantity: true },
-      orderBy: { _sum: { quantity: "desc" } },
-      take: 5,
-    }),
-    prisma.webhookEvent.findFirst({
-      orderBy: { receivedAt: "desc" },
-      select: { receivedAt: true },
-    }),
-  ]);
+  const [segmentCounts, rev30, rev90, allTime, topProducts, lastWebhook, abandoned7] =
+    await Promise.all([
+      Promise.all(
+        SEGMENTS.map(async (s) => ({
+          segment: s,
+          count: await prisma.customer.count({
+            where: { storeId, redactedAt: null, ...segmentWhere(s, now, riskDays) },
+          }),
+        })),
+      ),
+      prisma.order.aggregate({
+        where: { ...revenue, placedAt: { gte: since30 } },
+        _sum: { totalPrice: true },
+        _count: { _all: true },
+      }),
+      prisma.order.aggregate({
+        where: { ...revenue, placedAt: { gte: since90 } },
+        _sum: { totalPrice: true },
+        _count: { _all: true },
+      }),
+      prisma.order.aggregate({
+        where: revenue,
+        _sum: { totalPrice: true },
+        _count: { _all: true },
+      }),
+      prisma.orderLineItem.groupBy({
+        by: ["title"],
+        where: { order: { ...revenue, placedAt: { gte: since90 } } },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: "desc" } },
+        take: 5,
+      }),
+      prisma.webhookEvent.findFirst({
+        where: { storeId },
+        orderBy: { receivedAt: "desc" },
+        select: { receivedAt: true },
+      }),
+      prisma.checkout.aggregate({
+        where: { storeId, completedAt: null, startedAt: { gte: since7 } },
+        _sum: { totalPrice: true },
+        _count: { _all: true },
+      }),
+    ]);
 
   const cents = (d: Prisma.Decimal | null) => (d ? decimalToCents(d) : 0);
-  const revenue30 = cents(rev30._sum.totalPrice);
   const allTimeCents = cents(allTime._sum.totalPrice);
 
   return {
     riskDays,
     segments: segmentCounts,
     customersTotal: segmentCounts.reduce((s, x) => s + x.count, 0),
-    revenue30Cents: revenue30,
+    revenue30Cents: cents(rev30._sum.totalPrice),
     orders30: rev30._count._all,
     revenue90Cents: cents(rev90._sum.totalPrice),
     orders90: rev90._count._all,
     avgTicketCents: allTime._count._all ? Math.round(allTimeCents / allTime._count._all) : 0,
     topProducts90: topProducts.map((p) => ({ title: p.title, quantity: p._sum.quantity ?? 0 })),
     lastWebhookAt: lastWebhook?.receivedAt ?? null,
+    abandoned7Cents: cents(abandoned7._sum.totalPrice),
+    abandoned7Count: abandoned7._count._all,
   };
+}
+
+export type AbandonedCheckoutRow = Awaited<ReturnType<typeof listAbandonedCheckouts>>[number];
+
+/** Checkouts never completed, most recent first. */
+export async function listAbandonedCheckouts(storeId: string, limit = 50) {
+  const rows = await prisma.checkout.findMany({
+    where: { storeId, completedAt: null },
+    orderBy: { startedAt: "desc" },
+    take: limit,
+    include: {
+      customer: { select: { id: true, firstName: true, redactedAt: true, acceptsMarketing: true } },
+    },
+  });
+  return rows.map((c) => ({
+    id: c.id,
+    customerId: c.customer?.id ?? null,
+    firstName: c.customer?.redactedAt ? null : (c.customer?.firstName ?? null),
+    acceptsMarketing: c.customer?.acceptsMarketing ?? false,
+    email: c.email,
+    totalCents: decimalToCents(c.totalPrice),
+    currency: c.currency,
+    itemsCount: c.itemsCount,
+    items: (c.items as { title: string; quantity: number }[]).map(
+      (i) => `${i.quantity}× ${i.title}`,
+    ),
+    recoveryUrl: c.abandonedCheckoutUrl,
+    startedAt: c.startedAt,
+  }));
 }

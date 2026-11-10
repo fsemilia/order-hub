@@ -31,7 +31,9 @@
     "postinstall": "prisma generate",
     "check": "npm run lint && npm run typecheck && npm run test && npm run docs:check",
     "vercel-build": "prisma migrate deploy && next build",
-    "docs:check": "node scripts/check-docs.mjs"
+    "docs:check": "node scripts/check-docs.mjs",
+    "shopify:populate": "tsx scripts/shopify/populate.ts",
+    "shopify:abandon": "tsx scripts/shopify/abandon-checkouts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.7.0",

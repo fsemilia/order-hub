@@ -11,15 +11,16 @@ export function priceToCents(price: string): number {
   return sign ? -cents : cents;
 }
 
+/** 12990 -> "129.90" (integer arithmetic, no float), for APIs that take decimal strings. */
+export function centsToPrice(cents: number): string {
+  if (!Number.isInteger(cents)) throw new Error(`Cents must be an integer: ${cents}`);
+  const abs = Math.abs(cents);
+  return `${cents < 0 ? "-" : ""}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+}
+
 /** Accepts anything with a toString() that yields a decimal string (e.g. Prisma.Decimal). */
 export function decimalToCents(value: { toString(): string } | string | number): number {
   return priceToCents(typeof value === "number" ? value.toFixed(2) : value.toString());
 }
 
-const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-
-export function formatCents(cents: number, currency = "BRL"): string {
-  const formatter =
-    currency === "BRL" ? brl : new Intl.NumberFormat("pt-BR", { style: "currency", currency });
-  return formatter.format(cents / 100);
-}
+// Display formatting (locale + store currency) lives in lib/i18n/format.ts (formatMoney).

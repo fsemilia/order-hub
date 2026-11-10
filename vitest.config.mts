@@ -12,8 +12,8 @@ process.env.ORDER_HUB_TEST_DB = testDbUrl;
 
 const sharedEnv = {
   BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret-123",
-  SHOPIFY_WEBHOOK_SECRET: "test_webhook_secret",
-  SHOPIFY_SHOP_DOMAIN: "",
+  // 32 zero-ish bytes, base64: test-only key for per-store secret encryption
+  STORE_SECRETS_KEY: Buffer.alloc(32, 7).toString("base64"),
   CRM_RISK_DAYS: "60",
 };
 

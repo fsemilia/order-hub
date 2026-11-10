@@ -2,6 +2,7 @@
 // Conventions:
 //   * Money is always Decimal(12,2), never Float.
 //   * Shopify IDs are stored as String (they exceed JS safe integers in some resources).
+//   * Multi-store: every domain row belongs to a Store; Shopify IDs are unique per store.
 //   * Customer aggregates (ordersCount, totalSpent, first/lastOrderAt) are denormalized and
 //     recomputed inside the same transaction that writes an order: see lib/crm/aggregates.ts.
 //   * The segment (novo / recorrente / em_risco) is NOT stored: it depends on "now",
@@ -18,9 +19,39 @@ datasource db {
 
 // ─── Domain ─────────────────────────────────────────────────────────────────
 
+enum StoreKind {
+  DEMO
+  SHOPIFY
+}
+
+// A workspace: either the seeded demo store or a real Shopify store sending webhooks.
+model Store {
+  id               String    @id @default(cuid())
+  name             String
+  kind             StoreKind @default(SHOPIFY)
+  // e.g. "sitoweb1.myshopify.com"; null for the demo store
+  shopDomain       String?   @unique
+  // Shop currency (Shopify order totals are in the shop currency)
+  currency         String    @default("BRL") @db.Char(3)
+  // Webhook signing secret, AES-256-GCM encrypted with STORE_SECRETS_KEY (lib/crypto.ts)
+  webhookSecretEnc String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  customers     Customer[]
+  orders        Order[]
+  checkouts     Checkout[]
+  webhookEvents WebhookEvent[]
+  agentRuns     AgentRun[]
+
+  @@map("stores")
+}
+
 model Customer {
   id               String    @id @default(cuid())
-  shopifyId        String    @unique
+  storeId          String
+  store            Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shopifyId        String
   email            String?
   firstName        String?
   lastName         String?
@@ -36,17 +67,21 @@ model Customer {
   lastOrderAt  DateTime?
 
   orders    Order[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  checkouts Checkout[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
-  @@index([lastOrderAt])
-  @@index([totalSpent])
+  @@unique([storeId, shopifyId])
+  @@index([storeId, lastOrderAt])
+  @@index([storeId, totalSpent])
   @@map("customers")
 }
 
 model Order {
   id                String    @id @default(cuid())
-  shopifyId         String    @unique
+  storeId           String
+  store             Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shopifyId         String
   // Human-readable order name, e.g. "#1001"
   name              String
   customerId        String?
@@ -65,8 +100,9 @@ model Order {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
+  @@unique([storeId, shopifyId])
   @@index([customerId, placedAt])
-  @@index([placedAt])
+  @@index([storeId, placedAt])
   @@map("orders")
 }
 
@@ -89,17 +125,46 @@ model OrderLineItem {
 // so a duplicate delivery fails with P2002 inside the transaction and is acknowledged with 200.
 model WebhookEvent {
   id         String   @id
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   topic      String
   shopDomain String?
   receivedAt DateTime @default(now())
 
-  @@index([topic, receivedAt])
+  @@index([storeId, receivedAt])
   @@map("webhook_events")
+}
+
+// Shopify checkouts (checkouts/create, checkouts/update). Not completed = abandoned cart.
+model Checkout {
+  id                   String    @id @default(cuid())
+  storeId              String
+  store                Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shopifyId            String
+  customerId           String?
+  customer             Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  email                String?
+  totalPrice           Decimal   @db.Decimal(12, 2)
+  currency             String    @db.Char(3)
+  itemsCount           Int
+  items                Json
+  abandonedCheckoutUrl String?
+  startedAt            DateTime
+  completedAt          DateTime?
+  shopifyUpdatedAt     DateTime
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([storeId, shopifyId])
+  @@index([storeId, completedAt, startedAt])
+  @@map("checkouts")
 }
 
 // Audit + cost tracking for the AI agent (also used for the per-user daily limit).
 model AgentRun {
   id           String   @id @default(cuid())
+  storeId      String?
+  store        Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   question     String

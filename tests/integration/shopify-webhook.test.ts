@@ -7,32 +7,54 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { signShopifyPayload } from "@/lib/shopify/hmac";
 import { handleShopifyWebhook } from "@/lib/shopify/webhooks";
-import { prisma, resetDb } from "../support/db";
+import { rotateWebhookSecret } from "@/lib/stores/stores";
+import { createTestStore, prisma, resetDb, TEST_SECRET, TEST_SHOP } from "../support/db";
 
-const SECRET = "test_webhook_secret";
 const baseOrder = JSON.parse(readFileSync("tests/fixtures/orders-create.json", "utf8"));
 
-function deliver(topic: string, payload: unknown, opts: { id?: string; hmac?: string } = {}) {
+type DeliverOpts = { id?: string; hmac?: string; shop?: string; secret?: string };
+
+function deliver(topic: string, payload: unknown, opts: DeliverOpts = {}) {
   const raw = JSON.stringify(payload);
   const headers = new Headers({
     "x-shopify-topic": topic,
     "x-shopify-webhook-id": opts.id ?? randomUUID(),
-    "x-shopify-shop-domain": "order-hub-dev.myshopify.com",
-    "x-shopify-hmac-sha256": opts.hmac ?? signShopifyPayload(raw, SECRET),
+    "x-shopify-shop-domain": opts.shop ?? TEST_SHOP,
+    "x-shopify-hmac-sha256": opts.hmac ?? signShopifyPayload(raw, opts.secret ?? TEST_SECRET),
   });
   return handleShopifyWebhook(raw, headers);
 }
 
 const order = (overrides: Record<string, unknown> = {}) => ({ ...baseOrder, ...overrides });
-const customer = () => prisma.customer.findUniqueOrThrow({ where: { shopifyId: "7234018273645" } });
+let storeId: string;
+const customer = () =>
+  prisma.customer.findUniqueOrThrow({
+    where: { storeId_shopifyId: { storeId, shopifyId: "7234018273645" } },
+  });
 
-beforeEach(resetDb);
+beforeEach(async () => {
+  await resetDb();
+  storeId = (await createTestStore()).id;
+});
 
 describe("security", () => {
   it("rejects an invalid signature and writes nothing", async () => {
     const res = await deliver("orders/create", order(), { hmac: "forged" });
     expect(res.status).toBe(401);
     expect(await prisma.webhookEvent.count()).toBe(0);
+    expect(await prisma.order.count()).toBe(0);
+  });
+
+  it("rejects an unknown shop with the same 401 as a bad signature", async () => {
+    const res = await deliver("orders/create", order(), { shop: "unknown.myshopify.com" });
+    expect(res).toEqual({ status: 401, body: { error: "invalid signature" } });
+    expect(await prisma.webhookEvent.count()).toBe(0);
+  });
+
+  it("rejects a payload signed with ANOTHER store's secret", async () => {
+    await createTestStore("other-shop.myshopify.com", "other_secret");
+    const res = await deliver("orders/create", order(), { secret: "other_secret" });
+    expect(res.status).toBe(401);
     expect(await prisma.order.count()).toBe(0);
   });
 
@@ -170,6 +192,135 @@ describe("customers/redact (LGPD)", () => {
     await deliver("orders/updated", order({ updated_at: "2026-11-03T00:00:00Z" }));
     c = await customer();
     expect(c.email).toBeNull();
+  });
+});
+
+describe("store secrets", () => {
+  it("rotating the secret switches which signature is accepted; demo/unknown ids are refused", async () => {
+    expect(await rotateWebhookSecret(storeId, "rotated_secret_123456")).toBe(true);
+    expect((await deliver("orders/create", order())).status).toBe(401);
+    expect(
+      (await deliver("orders/create", order(), { secret: "rotated_secret_123456" })).status,
+    ).toBe(200);
+    expect(await rotateWebhookSecret("demo", "x".repeat(20))).toBe(false);
+    expect(await rotateWebhookSecret("nope", "x".repeat(20))).toBe(false);
+  });
+
+  it("stores the secret encrypted, never in clear", async () => {
+    const row = await prisma.store.findUniqueOrThrow({ where: { id: storeId } });
+    expect(row.webhookSecretEnc).toMatch(/^v1\./);
+    expect(row.webhookSecretEnc).not.toContain(TEST_SECRET);
+  });
+});
+
+describe("multi-store", () => {
+  it("keeps the same Shopify ids of two stores apart", async () => {
+    const other = await createTestStore("other-shop.myshopify.com", "other_secret");
+    await deliver("orders/create", order());
+    await deliver("orders/create", order(), {
+      shop: "other-shop.myshopify.com",
+      secret: "other_secret",
+    });
+
+    expect(await prisma.order.count()).toBe(2);
+    expect(await prisma.order.count({ where: { storeId: other.id } })).toBe(1);
+    expect(await prisma.customer.count({ where: { storeId } })).toBe(1);
+    expect(await prisma.webhookEvent.count({ where: { storeId: other.id } })).toBe(1);
+  });
+});
+
+describe("checkouts/*", () => {
+  const baseCheckout = {
+    id: 3500000000001,
+    email: "joana.silva@example.com",
+    total_price: "239.80",
+    currency: "brl",
+    created_at: "2026-11-01T10:00:00-03:00",
+    updated_at: "2026-11-01T10:05:00-03:00",
+    completed_at: null,
+    abandoned_checkout_url: "https://order-hub-dev.myshopify.com/123/checkouts/abc/recover",
+    customer: { id: 7234018273645, first_name: "Joana", email: "joana.silva@example.com" },
+    line_items: [
+      { title: "Sérum Vitamina C", quantity: 2, price: "119.90" },
+      { title: "Brinde", quantity: 1 },
+    ],
+  };
+  const checkout = () => prisma.checkout.findFirstOrThrow({ where: { storeId } });
+
+  it("stores an abandoned checkout linked to the customer", async () => {
+    const res = await deliver("checkouts/create", baseCheckout);
+    expect(res.status).toBe(200);
+    const c = await checkout();
+    expect(c).toMatchObject({ currency: "BRL", itemsCount: 3, completedAt: null });
+    expect(c.totalPrice.toString()).toBe("239.8");
+    expect(c.customerId).toBe((await customer()).id);
+  });
+
+  it("marks it completed on update and ignores stale updates", async () => {
+    await deliver("checkouts/create", baseCheckout);
+    await deliver("checkouts/update", {
+      ...baseCheckout,
+      completed_at: "2026-11-01T11:00:00-03:00",
+      updated_at: "2026-11-01T11:00:00-03:00",
+    });
+    const stale = await deliver("checkouts/update", baseCheckout);
+
+    expect(stale.body).toMatchObject({ result: { status: "stale" } });
+    expect((await checkout()).completedAt).not.toBeNull();
+    expect(await prisma.checkout.count()).toBe(1);
+  });
+
+  it("a checkout never brings back a redacted customer's email (LGPD)", async () => {
+    await deliver("checkouts/create", baseCheckout);
+    await deliver("customers/redact", { shop_domain: TEST_SHOP, customer: { id: 7234018273645 } });
+    await deliver("checkouts/update", { ...baseCheckout, updated_at: "2026-11-02T10:00:00-03:00" });
+    expect((await checkout()).email).toBeNull();
+  });
+
+  it("customers/redact also wipes guest checkouts with the same email", async () => {
+    await deliver("checkouts/create", { ...baseCheckout, customer: null });
+    await deliver("customers/redact", {
+      shop_domain: TEST_SHOP,
+      customer: { id: 7234018273645, email: "Joana.Silva@example.com" },
+    });
+    expect((await checkout()).email).toBeNull();
+  });
+
+  it("does not let a checkout overwrite newer customer consent or names", async () => {
+    await deliver("customers/update", {
+      id: 7234018273645,
+      first_name: "Joana",
+      email: "joana.silva@example.com",
+      email_marketing_consent: { state: "unsubscribed" },
+    });
+    await deliver("checkouts/create", {
+      ...baseCheckout,
+      customer: { ...baseCheckout.customer, first_name: "Old", accepts_marketing: true },
+    });
+    expect(await customer()).toMatchObject({ firstName: "Joana", acceptsMarketing: false });
+  });
+
+  it("the order that completes a checkout marks the cart as recovered", async () => {
+    await deliver("checkouts/create", baseCheckout);
+    await deliver("orders/create", order({ checkout_id: baseCheckout.id }));
+    expect((await checkout()).completedAt).not.toBeNull();
+  });
+
+  it("rejects a non-https recovery URL", async () => {
+    const res = await deliver("checkouts/create", {
+      ...baseCheckout,
+      abandoned_checkout_url: "javascript:alert(1)",
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it("customers/redact also removes the email from checkouts", async () => {
+    await deliver("checkouts/create", baseCheckout);
+    await deliver("customers/redact", {
+      shop_domain: TEST_SHOP,
+      customer: { id: 7234018273645 },
+    });
+    expect((await checkout()).email).toBeNull();
   });
 });
 

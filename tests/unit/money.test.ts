@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decimalToCents, formatCents, priceToCents } from "@/lib/money";
+import { centsToPrice, decimalToCents, priceToCents } from "@/lib/money";
 
 describe("priceToCents", () => {
   it.each([
@@ -26,9 +26,18 @@ describe("decimalToCents", () => {
   });
 });
 
-describe("formatCents", () => {
-  it("formats BRL in pt-BR", () => {
-    // Intl uses a non-breaking space between symbol and value
-    expect(formatCents(12990).replace(/\s/g, " ")).toBe("R$ 129,90");
+describe("centsToPrice", () => {
+  it.each([
+    [12990, "129.90"],
+    [5, "0.05"],
+    [0, "0.00"],
+    [-1250, "-12.50"],
+  ])("%i -> %s", (cents, price) => {
+    expect(centsToPrice(cents)).toBe(price);
+    expect(priceToCents(price)).toBe(cents);
+  });
+
+  it("rejects non-integers", () => {
+    expect(() => centsToPrice(1.5)).toThrow();
   });
 });

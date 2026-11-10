@@ -5,6 +5,12 @@ import { DEMO_EMAIL, DEMO_PASSWORD } from "./constants";
 test.use({ storageState: { cookies: [], origins: [] } });
 test.describe.configure({ mode: "serial" });
 
+async function signIn(page: import("@playwright/test").Page, password = DEMO_PASSWORD) {
+  await page.getByLabel("Email").fill(DEMO_EMAIL);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+}
+
 test("protected pages redirect to login, keeping the destination", async ({ page }) => {
   await page.goto("/customers");
   await expect(page).toHaveURL(/\/login\?next=%2Fcustomers/);
@@ -12,20 +18,38 @@ test("protected pages redirect to login, keeping the destination", async ({ page
 
 test("wrong password shows an error", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("E-mail").fill(DEMO_EMAIL);
-  await page.getByLabel("Senha").fill("wrong-password-123");
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.getByText("E-mail ou senha inválidos.")).toBeVisible();
+  await signIn(page, "wrong-password-123");
+  await expect(page.getByText("Invalid email or password.")).toBeVisible();
+});
+
+test("the login page can switch language before signing in", async ({ page }) => {
+  await page.goto("/login");
+  await page.waitForLoadState("networkidle"); // the switcher is a client component: wait for hydration
+  await page.getByLabel("Language").selectOption("it");
+  await expect(page.getByRole("heading", { name: "Accedi alla dashboard" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Lingua").selectOption("en");
+  await expect(page.getByRole("heading", { name: "Sign in to the dashboard" })).toBeVisible();
+});
+
+test("choosing 'Real store' at login opens a real store or the Stores page", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByText("Real store", { exact: true }).click();
+  await signIn(page);
+  // With no Shopify store connected (CI) the user lands on /stores to connect one.
+  await expect(async () => {
+    const onStores = /\/stores$/.test(page.url());
+    const current = await page.getByTestId("store-select").inputValue();
+    expect(onStores || current !== "demo").toBe(true);
+  }).toPass();
 });
 
 test("login, then sign out ends the session", async ({ page }) => {
   await page.goto("/login?next=%2Fcustomers");
-  await page.getByLabel("E-mail").fill(DEMO_EMAIL);
-  await page.getByLabel("Senha").fill(DEMO_PASSWORD);
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Sair" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
