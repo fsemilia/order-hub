@@ -28,7 +28,10 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   return (
-    <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang={locale}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
       <body className="min-h-full font-sans">
         <I18nProvider locale={locale} dict={getDictionary(locale)}>
           {children}

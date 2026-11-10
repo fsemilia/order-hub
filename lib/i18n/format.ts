@@ -21,7 +21,12 @@ function memo<T extends Intl.NumberFormat | Intl.DateTimeFormat | Intl.RelativeT
 export function formatMoney(cents: number, currency: string, locale: Locale): string {
   const f = memo(
     `n:${locale}:${currency}`,
-    () => new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "narrowSymbol" }),
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency,
+        currencyDisplay: "narrowSymbol",
+      }),
   );
   return f.format(cents / 100);
 }

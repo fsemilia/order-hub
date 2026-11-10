@@ -7,7 +7,9 @@ import { requireStoreContext } from "@/lib/stores/current";
 import { EmptyState, PageHeader, Skeleton } from "@/components/ui";
 import { AgentPanel } from "./agent-panel";
 
-export async function generateMetadata({ params }: PageProps<"/[locale]/agent">): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps<"/[locale]/agent">): Promise<Metadata> {
   const { locale } = await params;
   return isLocale(locale) ? { title: getDictionary(locale).nav.agent } : {};
 }

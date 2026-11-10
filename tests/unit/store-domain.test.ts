@@ -11,10 +11,13 @@ describe("normalizeShopDomain", () => {
     expect(normalizeShopDomain(input)).toBe(expected);
   });
 
-  it.each(["", "https://example.com", "evil.myshopify.com.attacker.io", "-bad.myshopify.com", "a b"])(
-    "rejects %j",
-    (input) => {
-      expect(normalizeShopDomain(input)).toBeNull();
-    },
-  );
+  it.each([
+    "",
+    "https://example.com",
+    "evil.myshopify.com.attacker.io",
+    "-bad.myshopify.com",
+    "a b",
+  ])("rejects %j", (input) => {
+    expect(normalizeShopDomain(input)).toBeNull();
+  });
 });

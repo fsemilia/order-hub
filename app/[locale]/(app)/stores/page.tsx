@@ -9,7 +9,9 @@ import { listStores, storeStats, WEBHOOK_TOPICS, type StoreSummary } from "@/lib
 import { Card, DemoBadge, PageHeader, Skeleton } from "@/components/ui";
 import { AddStoreForm, OpenStoreButton, RemoveStoreButton, RotateSecretForm } from "./store-forms";
 
-export async function generateMetadata({ params }: PageProps<"/[locale]/stores">): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps<"/[locale]/stores">): Promise<Metadata> {
   const { locale } = await params;
   return isLocale(locale) ? { title: getDictionary(locale).stores.title } : {};
 }
@@ -91,9 +93,7 @@ function StoreCard({
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-semibold">{store.name}</h2>
         {isDemo && <DemoBadge label={dict.common.demoBadge} />}
-        {store.shopDomain && (
-          <code className="text-xs text-zinc-500">{store.shopDomain}</code>
-        )}
+        {store.shopDomain && <code className="text-xs text-zinc-500">{store.shopDomain}</code>}
         <span className="text-xs text-zinc-500">{store.currency}</span>
         {current && (
           <span className="ml-auto rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -109,7 +109,10 @@ function StoreCard({
             [s.customers, counts.customers],
             [s.orders, counts.orders],
             [s.abandoned, counts.abandoned],
-            [s.lastWebhook, counts.lastWebhook ? formatDateTime(counts.lastWebhook, locale) : s.never],
+            [
+              s.lastWebhook,
+              counts.lastWebhook ? formatDateTime(counts.lastWebhook, locale) : s.never,
+            ],
           ] as const
         ).map(([label, value]) => (
           <div key={label}>
@@ -129,7 +132,10 @@ function StoreCard({
             <p className="text-xs font-medium text-zinc-500">{s.topics}</p>
             <ul className="flex flex-wrap gap-1">
               {WEBHOOK_TOPICS.map((topic) => (
-                <li key={topic} className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs dark:bg-zinc-800">
+                <li
+                  key={topic}
+                  className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs dark:bg-zinc-800"
+                >
                   {topic}
                 </li>
               ))}

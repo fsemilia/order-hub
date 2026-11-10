@@ -28,7 +28,8 @@ describe("dictionaries", () => {
           : Object.entries(o as object).flatMap(([k, v]) => flat(v, `${p}.${k}`));
     const source = new Map(flat(en));
     for (const dict of [ptBR, itDict]) {
-      for (const [k, v] of flat(dict)) expect(placeholders(v), k).toBe(placeholders(source.get(k)!));
+      for (const [k, v] of flat(dict))
+        expect(placeholders(v), k).toBe(placeholders(source.get(k)!));
     }
   });
 });

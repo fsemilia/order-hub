@@ -26,8 +26,13 @@ export function encryptSecret(plaintext: string, keyBase64: string): string {
 
 export function decryptSecret(payload: string, keyBase64: string): string {
   const [version, iv, tag, ciphertext] = payload.split(".");
-  if (version !== VERSION || !iv || !tag || !ciphertext) throw new Error("Malformed secret payload");
-  const decipher = createDecipheriv("aes-256-gcm", parseKey(keyBase64), Buffer.from(iv, "base64url"));
+  if (version !== VERSION || !iv || !tag || !ciphertext)
+    throw new Error("Malformed secret payload");
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    parseKey(keyBase64),
+    Buffer.from(iv, "base64url"),
+  );
   decipher.setAuthTag(Buffer.from(tag, "base64url"));
   return Buffer.concat([
     decipher.update(Buffer.from(ciphertext, "base64url")),

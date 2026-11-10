@@ -21,7 +21,8 @@ export async function askAgent(_prev: AskState, formData: FormData): Promise<Ask
     .min(5, errors.tooShort)
     .max(1000, errors.tooLong)
     .safeParse(formData.get("question"));
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? errors.invalid };
+  if (!parsed.success)
+    return { ok: false, error: parsed.error.issues[0]?.message ?? errors.invalid };
 
   return runAgent(parsed.data, { userId: user.id, store, locale });
 }

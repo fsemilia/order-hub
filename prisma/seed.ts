@@ -162,7 +162,13 @@ async function seedLocalShopifyStore() {
   const webhookSecretEnc = encryptSecret(secret, key);
   await prisma.store.upsert({
     where: { shopDomain },
-    create: { name: "Local dev store", kind: "SHOPIFY", shopDomain, currency: "BRL", webhookSecretEnc },
+    create: {
+      name: "Local dev store",
+      kind: "SHOPIFY",
+      shopDomain,
+      currency: "BRL",
+      webhookSecretEnc,
+    },
     update: { webhookSecretEnc },
   });
 }

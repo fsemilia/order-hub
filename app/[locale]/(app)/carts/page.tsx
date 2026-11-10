@@ -7,7 +7,9 @@ import { getI18n } from "@/lib/i18n/server";
 import { requireStoreContext } from "@/lib/stores/current";
 import { EmptyState, PageHeader, Skeleton, TextLink } from "@/components/ui";
 
-export async function generateMetadata({ params }: PageProps<"/[locale]/carts">): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps<"/[locale]/carts">): Promise<Metadata> {
   const { locale } = await params;
   return isLocale(locale) ? { title: getDictionary(locale).carts.title } : {};
 }

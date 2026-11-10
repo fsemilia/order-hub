@@ -27,7 +27,9 @@ describe("encryptSecret / decryptSecret", () => {
     const [v, iv, tag, ct] = encryptSecret("secret", KEY).split(".");
     const flipped = Buffer.from(ct!, "base64url");
     flipped[0] = flipped[0]! ^ 1;
-    expect(() => decryptSecret([v, iv, tag, flipped.toString("base64url")].join("."), KEY)).toThrow();
+    expect(() =>
+      decryptSecret([v, iv, tag, flipped.toString("base64url")].join("."), KEY),
+    ).toThrow();
   });
 
   it("rejects keys that are not 32 bytes", () => {

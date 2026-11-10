@@ -6,7 +6,9 @@ import { getI18n } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { LoginForm } from "./login-form";
 
-export async function generateMetadata({ params }: PageProps<"/[locale]/login">): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps<"/[locale]/login">): Promise<Metadata> {
   const { locale } = await params;
   return isLocale(locale) ? { title: getDictionary(locale).login.submit } : {};
 }

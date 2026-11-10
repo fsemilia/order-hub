@@ -23,7 +23,10 @@ const { values } = parseArgs({
     status: { type: "string" },
     repeat: { type: "string", default: "1" },
     fixture: { type: "string", default: "tests/fixtures/orders-create.json" },
-    shop: { type: "string", default: process.env.LOCAL_SHOP_DOMAIN || "order-hub-dev.myshopify.com" },
+    shop: {
+      type: "string",
+      default: process.env.LOCAL_SHOP_DOMAIN || "order-hub-dev.myshopify.com",
+    },
     secret: { type: "string", default: process.env.LOCAL_WEBHOOK_SECRET ?? "" },
   },
 });

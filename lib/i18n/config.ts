@@ -21,7 +21,8 @@ export function isLocale(value: unknown): value is Locale {
 export function splitLocalePrefix(pathname: string): { locale: Locale; rest: string } | null {
   for (const locale of LOCALES) {
     if (pathname === `/${locale}`) return { locale, rest: "/" };
-    if (pathname.startsWith(`/${locale}/`)) return { locale, rest: pathname.slice(locale.length + 1) };
+    if (pathname.startsWith(`/${locale}/`))
+      return { locale, rest: pathname.slice(locale.length + 1) };
   }
   return null;
 }

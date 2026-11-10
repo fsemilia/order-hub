@@ -163,9 +163,7 @@ async function CustomersTable({ searchParams }: { searchParams: SearchParams }) 
                     <SegmentBadge segment={c.segment} label={dict.segments[c.segment]} />
                   </td>
                   <td className="tabular px-4 py-3 text-right">{c.ordersCount}</td>
-                  <td className="tabular px-4 py-3 text-right font-medium">
-                    {money(c.ltvCents)}
-                  </td>
+                  <td className="tabular px-4 py-3 text-right font-medium">{money(c.ltvCents)}</td>
                   <td className="tabular px-4 py-3 text-right">{money(c.avgTicketCents)}</td>
                   <td className="px-4 py-3 text-zinc-500">
                     {formatRelativeDays(c.lastOrderAt, now, locale)}
@@ -186,9 +184,7 @@ async function CustomersTable({ searchParams }: { searchParams: SearchParams }) 
           >
             {d.previous}
           </Link>
-          <span className="tabular text-zinc-500">
-            {t(d.pageOf, { page, count: pageCount })}
-          </span>
+          <span className="tabular text-zinc-500">{t(d.pageOf, { page, count: pageCount })}</span>
           <Link
             href={href({ page: page + 1 })}
             aria-disabled={page >= pageCount}

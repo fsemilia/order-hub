@@ -89,7 +89,9 @@ async function CustomerDetail({ params }: { params: Promise<{ id: string }> }) {
               <tr key={o.id}>
                 <td className="px-5 py-2 font-medium">{o.name}</td>
                 <td className="px-5 py-2 text-zinc-500">{formatDate(o.placedAt, locale)}</td>
-                <td className="px-5 py-2">{orderStatusLabel(o.financialStatus, o.cancelled, dict)}</td>
+                <td className="px-5 py-2">
+                  {orderStatusLabel(o.financialStatus, o.cancelled, dict)}
+                </td>
                 <td
                   className="max-w-xs truncate px-5 py-2 text-zinc-500"
                   title={o.items.join(", ")}

@@ -10,7 +10,6 @@ import {
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-
 /**
  * 1. Locale. URLs have no locale prefix (/customers). The UI language comes from the oh_locale
  *    cookie (default English) and the request is REWRITTEN to /<locale>/customers, the [locale]
@@ -30,7 +29,11 @@ export function proxy(request: NextRequest) {
     url.pathname = safePath(prefixed.rest);
     url.search = search;
     const res = NextResponse.redirect(url);
-    res.cookies.set(LOCALE_COOKIE, prefixed.locale, { path: "/", maxAge: ONE_YEAR, sameSite: "lax" });
+    res.cookies.set(LOCALE_COOKIE, prefixed.locale, {
+      path: "/",
+      maxAge: ONE_YEAR,
+      sameSite: "lax",
+    });
     return res;
   }
 

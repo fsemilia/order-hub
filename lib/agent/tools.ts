@@ -38,7 +38,8 @@ export function createAgentTools(ctx: AgentContext, trace: ToolCallTrace[]) {
     }
   }
 
-  const money = (cents: number, currency = ctx.currency) => formatMoney(cents, currency, ctx.locale);
+  const money = (cents: number, currency = ctx.currency) =>
+    formatMoney(cents, currency, ctx.locale);
   // Redacted or nameless customers get null: the model must not invent a name.
   const firstName = (c: { name: string | null; redacted: boolean }) =>
     c.redacted || !c.name ? null : (c.name.split(" ")[0] ?? null);
@@ -157,5 +158,10 @@ export function createAgentTools(ctx: AgentContext, trace: ToolCallTrace[]) {
       }),
   });
 
-  return [getStoreOverviewTool, findCustomersTool, getCustomerProfileTool, listAbandonedCheckoutsTool];
+  return [
+    getStoreOverviewTool,
+    findCustomersTool,
+    getCustomerProfileTool,
+    listAbandonedCheckoutsTool,
+  ];
 }

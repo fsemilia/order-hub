@@ -10,11 +10,7 @@ import { logger } from "@/lib/logger";
 import { requireUser } from "@/lib/session";
 import { STORE_COOKIE } from "@/lib/stores/current";
 import { CURRENCIES, normalizeShopDomain } from "@/lib/stores/domain";
-import {
-  createShopifyStore,
-  deleteShopifyStore,
-  rotateWebhookSecret,
-} from "@/lib/stores/stores";
+import { createShopifyStore, deleteShopifyStore, rotateWebhookSecret } from "@/lib/stores/stores";
 
 export type StoreFormState =
   | null
@@ -69,7 +65,10 @@ export async function addStore(_prev: StoreFormState, formData: FormData): Promi
   return { ok: true, message: m.added };
 }
 
-export async function rotateSecret(_prev: StoreFormState, formData: FormData): Promise<StoreFormState> {
+export async function rotateSecret(
+  _prev: StoreFormState,
+  formData: FormData,
+): Promise<StoreFormState> {
   const user = await requireUser();
   const m = await messages(formData);
   const storeId = z.string().min(1).max(64).safeParse(formData.get("storeId"));

@@ -69,7 +69,11 @@ export async function storeStats() {
   const [customers, orders, checkouts, lastEvents] = await Promise.all([
     prisma.customer.groupBy({ by: ["storeId"], _count: { _all: true } }),
     prisma.order.groupBy({ by: ["storeId"], _count: { _all: true } }),
-    prisma.checkout.groupBy({ by: ["storeId"], where: { completedAt: null }, _count: { _all: true } }),
+    prisma.checkout.groupBy({
+      by: ["storeId"],
+      where: { completedAt: null },
+      _count: { _all: true },
+    }),
     prisma.webhookEvent.groupBy({ by: ["storeId"], _max: { receivedAt: true } }),
   ]);
   const by = <T extends { storeId: string }>(rows: T[]) => new Map(rows.map((r) => [r.storeId, r]));
