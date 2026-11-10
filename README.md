@@ -2,7 +2,7 @@
 
 🌐 **English** · [Português](README.pt-BR.md) · [Italiano](README.it.md)
 
-**Shopify → CRM with an AI retention agent.** Receives a Shopify store's orders through webhooks,
+**Shopify → CRM with an AI retention agent.** Receives orders from one or more Shopify stores through webhooks,
 stores them in PostgreSQL with Prisma, computes each customer's CRM metrics (LTV, average ticket,
 segment _new / repeat / at risk_) and offers an AI agent that answers questions like _"which
 customers are at risk? write me a win-back email"_ by querying the database through tool
@@ -23,16 +23,17 @@ calling, always returning drafts for human review.
 
 ## Features
 
-| Area                 | What it does                                                                                                                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Shopify webhooks** | `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`, `customers/create`, `customers/update`, `customers/redact`. HMAC verified on the raw body, idempotency by `X-Shopify-Webhook-Id`, one transaction, out-of-order events discarded. |
-| **CRM**              | LTV and average ticket per customer (using `current_total_price`, which already reflects refunds), segmentation new / repeat / at risk / no purchases, server-side filters and search.                                                                  |
-| **Dashboard**        | Revenue for the last 30/90 days, average ticket, segment distribution, best sellers.                                                                                                                                                                    |
-| **AI agent**         | Claude with 3 read-only tools, personal data minimization, per-user quota, token and tool audit log in `agent_runs`.                                                                                                                                    |
-| **Authentication**   | Better Auth: email/password with no public sign-up + optional GitHub OAuth with an allowlist; login rate limit.                                                                                                                                         |
-| **LGPD**             | `customers/redact` anonymizes the customer and keeps only the anonymous revenue history; the LLM never receives email or phone.                                                                                                                         |
-
-The UI is in Brazilian Portuguese: it is built for a Brazilian e-commerce team.
+| Area                 | What it does                                                                                                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Shopify webhooks** | `orders/create`, `orders/updated`, `orders/paid`, `orders/cancelled`, `customers/create`, `customers/update`, `customers/redact`, `checkouts/create`, `checkouts/update`. HMAC verified on the raw body, idempotency by `X-Shopify-Webhook-Id`, one transaction, out-of-order events discarded. |
+| **CRM**              | LTV and average ticket per customer (using `current_total_price`, which already reflects refunds), segmentation new / repeat / at risk / no purchases, server-side filters and search.                                                                                                          |
+| **Dashboard**        | Revenue for the last 30/90 days, average ticket, segment distribution, best sellers.                                                                                                                                                                                                            |
+| **AI agent**         | Claude with 4 read-only tools, bound to the current store,, personal data minimization, per-user quota, token and tool audit log in `agent_runs`.                                                                                                                                               |
+| **Authentication**   | Better Auth: email/password with no public sign-up + optional GitHub OAuth with an allowlist; login rate limit.                                                                                                                                                                                 |
+| **LGPD**             | `customers/redact` anonymizes the customer and keeps only the anonymous revenue history; the LLM never receives email or phone.                                                                                                                                                                 |
+| **Multi-store**      | Demo data and real Shopify stores side by side: per-store data and webhook secret (encrypted with AES-256-GCM), store switcher in the header, "Demo data / Real store" toggle at login, Stores page to connect stores.                                                                          |
+| **Abandoned carts**  | `checkouts/*` webhooks, list with recovery link, 7-day KPI on the dashboard, agent tool for recovery messages.                                                                                                                                                                                  |
+| **Languages**        | UI in English (default), Portuguese and Italian; money and dates formatted with `Intl` in the store currency; the agent answers in the UI language.                                                                                                                                             |
 
 ## Architecture
 
@@ -73,10 +74,10 @@ Requirements: Node 22+ and npm. **No Docker needed**: local Postgres is `prisma 
 ```bash
 git clone https://github.com/fsemilia/order-hub && cd order-hub
 npm install
-cp .env.example .env              # generate BETTER_AUTH_SECRET: openssl rand -base64 32
+cp .env.example .env              # BETTER_AUTH_SECRET and STORE_SECRETS_KEY: openssl rand -base64 32
 npm run db:dev                    # starts local Postgres (port 51214)
 npx prisma migrate deploy         # creates the tables
-npm run db:seed                   # 160 customers, ~440 orders and the demo user
+npm run db:seed                   # demo store (160 customers, ~430 orders, carts) + demo user
 npm run dev                       # http://localhost:3000
 ```
 
@@ -90,13 +91,21 @@ npm run webhook:send -- --repeat 2                     # same webhook twice → 
 npm run webhook:send -- --topic orders/updated --status refunded
 ```
 
+Fill a real Shopify development store with test data (through the Shopify CLI; details in
+[`docs/en/shopify-setup.md`](docs/en/shopify-setup.md)):
+
+```bash
+npm run shopify:populate -- --store your-store.myshopify.com   # products, customers, orders
+npm run shopify:abandon  -- --store your-store.myshopify.com   # abandoned checkouts (storefront)
+```
+
 To connect a real development store: [`docs/en/shopify-setup.md`](docs/en/shopify-setup.md).
 To deploy on Vercel with Supabase: [`docs/en/deploy.md`](docs/en/deploy.md).
 
 ## Tests
 
 ```bash
-npm run check             # lint + typecheck + unit tests (40)
+npm run check             # lint + typecheck + unit tests
 npm run db:test:start     # separate Postgres for tests
 npm run test:integration  # webhook pipeline and queries on a real database (21)
 npm run test:e2e          # Playwright: login, filters, detail, logout (8)
@@ -120,7 +129,7 @@ out-of-order webhooks, partial and full refunds, cancellation, guest checkout, i
 
 ## Known limitations
 
-The conscious trade-offs and known gaps (single store, synchronous webhooks, per-instance rate
+The conscious trade-offs and known gaps (stores connected by hand, synchronous webhooks, per-instance rate
 limit, two compliance webhooks only acknowledged, agent without automated evals, local
 `prisma dev` quirks and more) are listed, each with its fix, in
 [`docs/en/limitations.md`](docs/en/limitations.md).
@@ -129,14 +138,18 @@ limit, two compliance webhooks only acknowledged, agent without automated evals,
 
 ```text
 app/
-  (app)/            authenticated pages: overview, customers, agent
+  [locale]/         root layout per language (en · pt-BR · it); URLs stay unprefixed (proxy.ts)
+    (app)/          authenticated pages: overview, customers, abandoned carts, agent, stores
+    login/
   api/              Shopify webhooks, Better Auth, health check
-  login/
 lib/
   shopify/          hmac, Zod schemas, idempotent ingestion, webhook pipeline
+  stores/           stores, encrypted secrets, current store
   crm/              segment rules, aggregates, queries
   agent/            tools, prompt, run
+  i18n/             locales, typed dictionaries, Intl formatting
 prisma/             schema, migrations, seed
+scripts/shopify/    populate a real development store (products, customers, orders, carts)
 tests/              unit · integration · e2e · fixtures
 docs/               en · pt-BR · it — architecture, ADRs, Shopify setup, deploy, agent, limitations
 .claude/            Claude Code skills, reviewer subagent and hooks

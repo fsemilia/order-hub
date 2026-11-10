@@ -2,10 +2,10 @@
 
 @AGENTS.md
 
-Shopify → CRM for Brazilian e-commerce: receives Shopify order webhooks, stores them in Postgres
-with Prisma, computes customer metrics (LTV, average ticket, segment novo/recorrente/em_risco)
-and offers a read-only AI retention agent. UI and user-facing copy are in **pt-BR**; code,
-comments, commits and identifiers are in **English**.
+Shopify → CRM for Brazilian e-commerce: receives Shopify webhooks from **several stores** (plus a
+demo store), stores them in Postgres with Prisma, computes customer metrics (LTV, average ticket, segment novo/recorrente/em_risco)
+and offers a read-only AI retention agent. The UI is in **English (default), pt-BR and it**
+(`lib/i18n` dictionaries); code, comments, commits and identifiers are in **English**.
 
 ## Stack
 
@@ -35,8 +35,10 @@ npm run webhook:send      # send a signed Shopify webhook to localhost
 - `lib/shopify/` — `hmac.ts`, `schemas.ts` (Zod), `ingest.ts` (idempotent upserts), `webhooks.ts` (pipeline)
 - `lib/crm/` — `segments.ts` (pure rules), `aggregates.ts` (recompute in tx), `queries.ts` (read models)
 - `lib/agent/` — `tools.ts`, `prompt.ts`, `run.ts`
-- `lib/session.ts` — Data Access Layer: `requireUser()`; `proxy.ts` is only an optimistic cookie check
-- `app/(app)/` — authenticated pages; `app/login/`
+- `lib/stores/` — stores, encrypted webhook secrets (`lib/crypto.ts`), `requireStoreContext()`
+- `lib/i18n/` — locales, typed dictionaries (en is the source), `Intl` formatting
+- `lib/session.ts` — Data Access Layer: `requireUser()`; `proxy.ts` is an optimistic cookie check + locale rewrite
+- `app/[locale]/(app)/` — authenticated pages; `app/[locale]/login/`; `scripts/shopify/` — populate a real store
 - `docs/{en,pt-BR,it}/` — architecture, ADRs, Shopify setup, deploy, agent, **limitations**
 
 ## Invariants (do not break)
@@ -46,12 +48,15 @@ npm run webhook:send      # send a signed Shopify webhook to localhost
    stale-update guard on `updated_at`; status codes as documented in `lib/shopify/webhooks.ts`.
 3. **Aggregates** are recomputed from orders inside the same transaction (never incremented).
 4. **Segments** depend on "now": derived at query time (`segmentOf` / `segmentWhere`), never stored.
-5. **Authorization** happens in `requireUser()` next to the data, in every page/action/route
-   that touches customer data. Server Actions validate input with Zod.
+5. **Authorization** happens in `requireUser()` / `requireStoreContext()` next to the data, in every
+   page/action/route that touches customer data. **Every query is scoped by `storeId`.** Server
+   Actions validate input with Zod. Webhook secrets are stored encrypted and never logged or returned.
 6. **LGPD**: the agent only sees first name + internal id. Redacted customers never regain PII.
 7. **Cache Components**: request-time data (session, `searchParams`, `params`, `usePathname`)
    lives inside `<Suspense>`; the static shell must prerender (`npm run build` enforces it).
-8. Files importing `server-only` cannot run in plain Node: scripts use `tsx --conditions=react-server`,
+8. **i18n**: every user-facing string goes in all three dictionaries (the typecheck and
+   `tests/unit/i18n.test.ts` enforce it); money via `formatMoney(cents, store.currency, locale)`.
+9. Files importing `server-only` cannot run in plain Node: scripts use `tsx --conditions=react-server`,
    Vitest aliases `server-only` to a stub.
 
 ## Working agreements

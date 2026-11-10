@@ -15,7 +15,7 @@ export default defineConfig({
   // dev server compiles routes on first hit
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  use: { baseURL, trace: "retain-on-failure", locale: "pt-BR" },
+  use: { baseURL, trace: "retain-on-failure", locale: "en-US" },
   projects: [
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     {

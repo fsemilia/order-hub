@@ -15,7 +15,8 @@ env:
   DATABASE_URL_TEST: postgres://postgres:postgres@localhost:5432/order_hub?sslmode=disable
   BETTER_AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
   BETTER_AUTH_URL: http://localhost:3000
-  SHOPIFY_WEBHOOK_SECRET: ci_webhook_secret
+  # test-only key (32 bytes of 0x07, base64)
+  STORE_SECRETS_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
   DEMO_EMAIL: demo@orderhub.dev
   DEMO_PASSWORD: ci-demo-password-123
   NEXT_TELEMETRY_DISABLED: 1

@@ -5,6 +5,10 @@
  *   npm run webhook:send -- --topic orders/updated --status refunded
  *   npm run webhook:send -- --url https://order-hub.vercel.app/api/webhooks/shopify
  *   npm run webhook:send -- --repeat 2                    # same webhook id twice → idempotency
+ *   npm run webhook:send -- --topic checkouts/create --fixture tests/fixtures/checkouts-create.json
+ *
+ * Signs as the local store registered by `npm run db:seed` (LOCAL_SHOP_DOMAIN /
+ * LOCAL_WEBHOOK_SECRET); --shop and --secret target any other store.
  */
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
@@ -19,11 +23,16 @@ const { values } = parseArgs({
     status: { type: "string" },
     repeat: { type: "string", default: "1" },
     fixture: { type: "string", default: "tests/fixtures/orders-create.json" },
+    shop: {
+      type: "string",
+      default: process.env.LOCAL_SHOP_DOMAIN || "order-hub-dev.myshopify.com",
+    },
+    secret: { type: "string", default: process.env.LOCAL_WEBHOOK_SECRET ?? "" },
   },
 });
 
-const secret = process.env.SHOPIFY_WEBHOOK_SECRET ?? "";
-if (!secret) throw new Error("SHOPIFY_WEBHOOK_SECRET is not set");
+const secret = values.secret!;
+if (!secret) throw new Error("Pass --secret or set LOCAL_WEBHOOK_SECRET");
 
 const payload = JSON.parse(readFileSync(values.fixture!, "utf8"));
 payload.updated_at = new Date().toISOString();
@@ -40,7 +49,7 @@ async function main() {
         "x-shopify-topic": values.topic!,
         "x-shopify-hmac-sha256": signShopifyPayload(body, secret),
         "x-shopify-webhook-id": webhookId,
-        "x-shopify-shop-domain": process.env.SHOPIFY_SHOP_DOMAIN || "order-hub-dev.myshopify.com",
+        "x-shopify-shop-domain": values.shop!,
         "x-shopify-api-version": "2026-10",
       },
       body,

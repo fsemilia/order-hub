@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
-import { SEGMENT_LABELS, type Segment } from "@/lib/crm/segments";
+import type { Segment } from "@/lib/crm/segments";
 
 export function cn(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(" ");
@@ -66,7 +66,8 @@ const SEGMENT_STYLES: Record<Segment, string> = {
   sem_compras: "bg-zinc-100 text-zinc-600 ring-zinc-500/20 dark:bg-zinc-800 dark:text-zinc-300",
 };
 
-export function SegmentBadge({ segment }: { segment: Segment }) {
+/** `label` comes from the dictionary (dict.segments[segment]). */
+export function SegmentBadge({ segment, label }: { segment: Segment; label: string }) {
   return (
     <span
       className={cn(
@@ -74,7 +75,7 @@ export function SegmentBadge({ segment }: { segment: Segment }) {
         SEGMENT_STYLES[segment],
       )}
     >
-      {SEGMENT_LABELS[segment]}
+      {label}
     </span>
   );
 }
@@ -120,5 +121,13 @@ export function TextLink(props: ComponentProps<typeof Link>) {
         props.className,
       )}
     />
+  );
+}
+
+export function DemoBadge({ label }: { label: string }) {
+  return (
+    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+      {label}
+    </span>
   );
 }

@@ -5,7 +5,9 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { DAY_MS } from "@/lib/crm/segments";
-import { SYSTEM_PROMPT } from "./prompt";
+import { getDictionary, t, type Locale } from "@/lib/i18n";
+import type { StoreSummary } from "@/lib/stores/stores";
+import { languageInstruction, SYSTEM_PROMPT } from "./prompt";
 import { createAgentTools, type ToolCallTrace } from "./tools";
 
 export type AgentResult =
@@ -41,17 +43,16 @@ export async function remainingQuota(userId: string, now = new Date()) {
  * - Server-side refusal fallback enabled ("default" routing by refusal category).
  * - Token usage summed across every turn and stored in AgentRun (cost tracking + daily quota).
  */
-export async function runAgent(question: string, userId: string): Promise<AgentResult> {
-  if (!isAgentConfigured())
-    return { ok: false, error: "Agente não configurado (ANTHROPIC_API_KEY)." };
-  if ((await remainingQuota(userId)) <= 0) {
-    return {
-      ok: false,
-      error: "Limite de perguntas das últimas 24 horas atingido. Tente mais tarde.",
-    };
-  }
+export async function runAgent(
+  question: string,
+  { userId, store, locale }: { userId: string; store: StoreSummary; locale: Locale },
+): Promise<AgentResult> {
+  const errors = getDictionary(locale).agent.errors;
+  if (!isAgentConfigured()) return { ok: false, error: errors.notConfigured };
+  // The quota is per user across stores: it is a cost guard, not a per-store feature.
+  if ((await remainingQuota(userId)) <= 0) return { ok: false, error: errors.quota };
 
-  const run = await prisma.agentRun.create({ data: { userId, question } });
+  const run = await prisma.agentRun.create({ data: { userId, storeId: store.id, question } });
   const trace: ToolCallTrace[] = [];
   const start = Date.now();
   let inputTokens = 0;
@@ -64,8 +65,11 @@ export async function runAgent(question: string, userId: string): Promise<AgentR
       output_config: { effort: "medium" },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: SYSTEM_PROMPT,
-      tools: createAgentTools(trace),
+      system: [
+        { type: "text", text: SYSTEM_PROMPT },
+        { type: "text", text: languageInstruction(locale) },
+      ],
+      tools: createAgentTools({ storeId: store.id, currency: store.currency, locale }, trace),
       messages: [{ role: "user", content: question }],
       max_iterations: MAX_ITERATIONS,
     });
@@ -84,9 +88,9 @@ export async function runAgent(question: string, userId: string): Promise<AgentR
       .join("\n")
       .trim();
     if (final.stop_reason === "refusal") {
-      answer = "O modelo não pôde responder a esta pergunta. Reformule com foco nos dados da loja.";
+      answer = errors.refusal;
     } else if (final.stop_reason === "tool_use") {
-      answer ||= "A análise ficou longa demais. Tente uma pergunta mais específica.";
+      answer ||= errors.tooLongAnalysis;
     }
 
     const durationMs = Date.now() - start;
@@ -96,6 +100,7 @@ export async function runAgent(question: string, userId: string): Promise<AgentR
     });
     logger.info("agent.run", {
       runId: run.id,
+      storeId: store.id,
       durationMs,
       inputTokens,
       outputTokens,
@@ -105,10 +110,10 @@ export async function runAgent(question: string, userId: string): Promise<AgentR
   } catch (e) {
     const message =
       e instanceof Anthropic.RateLimitError
-        ? "A API de IA está sobrecarregada. Tente em instantes."
+        ? errors.rateLimited
         : e instanceof Anthropic.APIError
-          ? `Erro da API de IA (${e.status ?? "rede"}).`
-          : "Erro inesperado ao executar o agente.";
+          ? t(errors.api, { status: e.status ?? "network" })
+          : errors.unexpected;
     await prisma.agentRun.update({
       where: { id: run.id },
       data: { error: String(e), toolCalls: asJson(trace), durationMs: Date.now() - start },

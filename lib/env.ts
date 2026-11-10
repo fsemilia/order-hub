@@ -27,8 +27,10 @@ const schema = z.object({
   GITHUB_CLIENT_ID: optional(z.string()),
   GITHUB_CLIENT_SECRET: optional(z.string()),
 
-  SHOPIFY_WEBHOOK_SECRET: z.string().min(1),
-  SHOPIFY_SHOP_DOMAIN: optional(z.string()),
+  // 32 random bytes, base64 (`openssl rand -base64 32`): encrypts per-store webhook secrets.
+  STORE_SECRETS_KEY: z.string().refine((v) => Buffer.from(v, "base64").length === 32, {
+    message: "STORE_SECRETS_KEY must be 32 bytes, base64-encoded",
+  }),
 
   ANTHROPIC_API_KEY: optional(z.string()),
   ANTHROPIC_MODEL: z.preprocess(emptyToUndefined, z.string().default("claude-opus-5-5")),

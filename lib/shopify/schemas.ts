@@ -37,19 +37,42 @@ export const shopifyOrderSchema = z.object({
   financial_status: z.string().nullish(),
   fulfillment_status: z.string().nullish(),
   created_at: isoDate,
+  // Business date of the order; differs from created_at for imported/backdated orders
+  processed_at: isoDate.nullish(),
   updated_at: isoDate,
   cancelled_at: isoDate.nullish(),
+  // Links the order to the checkout it completed (marks the abandoned cart as recovered)
+  checkout_id: shopifyId.nullish(),
   customer: shopifyCustomerSchema.nullish(),
   line_items: z.array(shopifyLineItemSchema).default([]),
+});
+
+// checkouts/create, checkouts/update (REST webhook format)
+export const shopifyCheckoutSchema = z.object({
+  id: shopifyId,
+  email: z.string().nullish(),
+  total_price: money,
+  currency: z.string().length(3),
+  created_at: isoDate,
+  updated_at: isoDate,
+  completed_at: isoDate.nullish(),
+  // https only: it is rendered as a link (no javascript:/data: URLs even from a signed payload)
+  abandoned_checkout_url: z.url({ protocol: /^https$/ }).nullish(),
+  customer: shopifyCustomerSchema.nullish(),
+  line_items: z
+    .array(z.object({ title: z.string(), quantity: z.number().int(), price: money.nullish() }))
+    .default([]),
 });
 
 export const customersRedactSchema = z.object({
   shop_domain: z.string(),
   customer: z.object({ id: shopifyId, email: z.string().nullish() }),
 });
+export type CustomersRedact = z.infer<typeof customersRedactSchema>;
 
 export type ShopifyOrder = z.infer<typeof shopifyOrderSchema>;
 export type ShopifyCustomer = z.infer<typeof shopifyCustomerSchema>;
+export type ShopifyCheckout = z.infer<typeof shopifyCheckoutSchema>;
 
 export function acceptsMarketing(c: ShopifyCustomer): boolean {
   if (c.email_marketing_consent?.state) return c.email_marketing_consent.state === "subscribed";

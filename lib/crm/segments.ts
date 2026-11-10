@@ -12,13 +12,6 @@ import type { Prisma } from "@/generated/prisma/client";
 export const SEGMENTS = ["novo", "recorrente", "em_risco", "sem_compras"] as const;
 export type Segment = (typeof SEGMENTS)[number];
 
-export const SEGMENT_LABELS: Record<Segment, string> = {
-  novo: "Novo",
-  recorrente: "Recorrente",
-  em_risco: "Em risco",
-  sem_compras: "Sem compras",
-};
-
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function isSegment(value: unknown): value is Segment {

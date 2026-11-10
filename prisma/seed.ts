@@ -5,15 +5,19 @@
  * so the seed also exercises the ingestion pipeline. Deterministic (faker.seed) so screenshots
  * and E2E tests are stable.
  *
+ * Everything lives in the DEMO store (id "demo"): real Shopify stores are never touched.
+ *
  * Run: npm run db:seed   (refuses to run against production)
  */
 import "dotenv/config";
 import { fakerPT_BR as faker } from "@faker-js/faker";
 import { hashPassword } from "better-auth/crypto";
 import { PrismaClient } from "../generated/prisma/client";
-import { shopifyOrderSchema } from "../lib/shopify/schemas";
-import { ingestOrder } from "../lib/shopify/ingest";
+import { shopifyCheckoutSchema, shopifyOrderSchema } from "../lib/shopify/schemas";
+import { ingestCheckout, ingestOrder } from "../lib/shopify/ingest";
+import { DEMO_STORE_ID } from "../lib/stores/domain";
 import { createPgAdapter } from "../lib/db-adapter";
+import { encryptSecret } from "../lib/crypto";
 
 if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
   throw new Error("Refusing to seed a production database.");
@@ -123,6 +127,52 @@ function buildOrderPayload(customer: Record<string, unknown>, placedAt: number, 
   };
 }
 
+function buildCheckoutPayload(customer: Record<string, unknown>) {
+  const startedAt = NOW - faker.number.int({ min: 1, max: 14 * 24 }) * 3_600_000;
+  const items = faker.helpers.arrayElements(PRODUCTS, { min: 1, max: 3 }).map((prod) => ({
+    title: prod.title,
+    quantity: faker.number.int({ min: 1, max: 2 }),
+    price: prod.price,
+  }));
+  const totalCents = items.reduce((s, i) => s + Math.round(Number(i.price) * 100) * i.quantity, 0);
+  const token = faker.string.alphanumeric(32);
+  return {
+    id: faker.string.numeric(14),
+    email: customer.email,
+    total_price: (totalCents / 100).toFixed(2),
+    currency: "BRL",
+    created_at: new Date(startedAt).toISOString(),
+    updated_at: new Date(startedAt + 120_000).toISOString(),
+    completed_at: null,
+    abandoned_checkout_url: `https://demo.myshopify.com/checkouts/${token}/recover`,
+    customer,
+    line_items: items,
+  };
+}
+
+/**
+ * Local dev convenience: an (empty) SHOPIFY store matching LOCAL_SHOP_DOMAIN/LOCAL_WEBHOOK_SECRET,
+ * so `npm run webhook:send` works out of the box. Skipped when the variables are missing.
+ */
+async function seedLocalShopifyStore() {
+  const shopDomain = process.env.LOCAL_SHOP_DOMAIN;
+  const secret = process.env.LOCAL_WEBHOOK_SECRET;
+  const key = process.env.STORE_SECRETS_KEY;
+  if (!shopDomain || !secret || !key) return;
+  const webhookSecretEnc = encryptSecret(secret, key);
+  await prisma.store.upsert({
+    where: { shopDomain },
+    create: {
+      name: "Local dev store",
+      kind: "SHOPIFY",
+      shopDomain,
+      currency: "BRL",
+      webhookSecretEnc,
+    },
+    update: { webhookSecretEnc },
+  });
+}
+
 async function seedDemoUser() {
   const email = (process.env.DEMO_EMAIL || "demo@orderhub.dev").toLowerCase();
   const password = process.env.DEMO_PASSWORD || "change-me-demo-123";
@@ -153,14 +203,14 @@ async function main() {
   faker.seed(42);
   const email = await seedDemoUser();
 
-  await prisma.$transaction([
-    prisma.orderLineItem.deleteMany(),
-    prisma.order.deleteMany(),
-    prisma.customer.deleteMany(),
-    prisma.webhookEvent.deleteMany(),
-  ]);
+  // Reset ONLY the demo store (cascade removes its customers, orders, checkouts, events).
+  await prisma.store.deleteMany({ where: { id: DEMO_STORE_ID } });
+  await prisma.store.create({
+    data: { id: DEMO_STORE_ID, name: "Demo store", kind: "DEMO", currency: "BRL" },
+  });
 
   let orders = 0;
+  let checkouts = 0;
   const CUSTOMERS = 160;
   for (let i = 0; i < CUSTOMERS; i++) {
     const firstName = faker.person.firstName();
@@ -178,12 +228,22 @@ async function main() {
     const p = persona();
     for (const placedAt of orderDates(p)) {
       const payload = shopifyOrderSchema.parse(buildOrderPayload(customer, placedAt, p));
-      await prisma.$transaction((tx) => ingestOrder(tx, payload));
+      await prisma.$transaction((tx) => ingestOrder(tx, DEMO_STORE_ID, payload));
       orders++;
+    }
+    // ~15% of customers also left a cart behind in the last 2 weeks
+    if (faker.datatype.boolean(0.15)) {
+      const payload = shopifyCheckoutSchema.parse(buildCheckoutPayload(customer));
+      await prisma.$transaction((tx) => ingestCheckout(tx, DEMO_STORE_ID, payload));
+      checkouts++;
     }
   }
 
-  console.log(`Seeded ${CUSTOMERS} customers, ${orders} orders. Demo login: ${email}`);
+  await seedLocalShopifyStore();
+
+  console.log(
+    `Seeded ${CUSTOMERS} customers, ${orders} orders, ${checkouts} abandoned checkouts. Demo login: ${email}`,
+  );
 }
 
 main()
