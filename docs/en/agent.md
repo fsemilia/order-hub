@@ -2,8 +2,8 @@
 
 🌐 **English** · [Português](../pt-BR/agent.md) · [Italiano](../it/agent.md)
 
-Answers questions about the customer base and drafts retention messages (in Portuguese, for the
-Brazilian team).
+Answers questions about the customer base of the current store, including abandoned carts, and
+drafts retention messages in the interface language (English, Portuguese or Italian).
 
 ## How it works
 
@@ -11,18 +11,19 @@ Brazilian team).
 Question (Server Action, authenticated, Zod)
   → per-user quota over the last 24 h (agent_runs)
   → Anthropic SDK tool runner (Claude, effort "medium", max 6 iterations)
-      ↔ get_store_overview / find_customers / get_customer_profile   (read-only)
+      ↔ get_store_overview / find_customers / get_customer_profile / list_abandoned_checkouts   (read-only)
   → answer shown as an editable draft
   → agent_runs: question, answer, tools, tokens, latency
 ```
 
 ## Tools
 
-| Tool                   | Input                   | Returns                                                               |
-| ---------------------- | ----------------------- | --------------------------------------------------------------------- |
-| `get_store_overview`   | —                       | customers per segment, revenue 30/90d, average ticket, best sellers   |
-| `find_customers`       | `segment`, `limit ≤ 50` | id, first name, orders, LTV, average ticket, days since last purchase |
-| `get_customer_profile` | `customer_id`           | metrics, marketing consent, last 10 orders with items                 |
+| Tool                       | Input                   | Returns                                                                                       |
+| -------------------------- | ----------------------- | --------------------------------------------------------------------------------------------- |
+| `get_store_overview`       | —                       | customers per segment, revenue 30/90d, average ticket, best sellers                           |
+| `find_customers`           | `segment`, `limit ≤ 50` | id, first name, orders, LTV, average ticket, days since last purchase                         |
+| `get_customer_profile`     | `customer_id`           | metrics, marketing consent, last 10 orders with items                                         |
+| `list_abandoned_checkouts` | `limit ≤ 30`            | customer id, first name (null for guests), consent, items, value, days since the cart started |
 
 All of them reuse `lib/crm/queries.ts`, which has integration tests.
 
@@ -32,7 +33,11 @@ All of them reuse `lib/crm/queries.ts`, which has integration tests.
   always belong to a human.
 - **Data minimization (LGPD)**: the model receives first name and internal id — never email,
   phone or last name. It only suggests marketing for customers who gave consent.
-- **Values pre-formatted in R$**: the model does no money arithmetic.
+- **Values pre-formatted in the store currency**: the model does no money arithmetic.
+- **Bound to the current store**: the server creates the tools with the `storeId` of the user's
+  current store; the model cannot choose or see another store. Each run is stored with its `storeId`.
+- **Answers in the UI language**: the system prompt is in English and a second block asks for
+  English, Portuguese or Italian, following the interface.
 - **Store data is data**: names and product titles may contain malicious text (prompt
   injection); the prompt tells the model to treat them as data, and the tools allow no dangerous
   action even if it complied.

@@ -12,7 +12,7 @@ Components read the database directly and Server Actions run mutations and the a
              ┌─────────────── Vercel (gru1) ───────────────┐
 Shopify ───▶ │ /api/webhooks/shopify  → lib/shopify/*      │
              │ /api/auth/*            → Better Auth        │ ───▶ Supabase Postgres
-Team ──────▶ │ proxy.ts → app/(app)/* → lib/crm/queries    │      (pooler 6543)
+Team ──────▶ │ proxy.ts → app/[locale]/* → lib/crm/queries    │      (pooler 6543)
              │ Server Action → lib/agent → Anthropic API   │
              └─────────────────────────────────────────────┘
 ```
@@ -20,22 +20,23 @@ Team ──────▶ │ proxy.ts → app/(app)/* → lib/crm/queries    �
 ## Life of a webhook
 
 1. `route.ts` reads the **raw body** (`req.text()`): the HMAC is computed over the exact bytes.
-2. `verifyShopifyHmac` compares it in constant time with the app secret.
-3. Required headers (`X-Shopify-Webhook-Id`, `X-Shopify-Topic`) and, optionally, the allowed shop
-   (`SHOPIFY_SHOP_DOMAIN`).
-4. **One transaction**:
-   - insert `webhook_events(id)` — if the id already exists, `P2002` → `200 {duplicate: true}`;
+2. The store is resolved from `X-Shopify-Shop-Domain` and its webhook secret is decrypted
+   (AES-256-GCM, `STORE_SECRETS_KEY`). Unknown shop → `401`, the same answer as a bad signature.
+3. `verifyShopifyHmac` compares the signature in constant time with **that store's** secret.
+4. Required headers (`X-Shopify-Webhook-Id`, `X-Shopify-Topic`).
+5. **One transaction**:
+   - insert `webhook_events(id)` with `skipDuplicates` — if the id already exists → `200 {duplicate: true}`;
    - validate the payload with Zod (invalid → `422` and rollback, nothing is written);
-   - run the topic handler (upsert of order, line items, customer);
+   - run the topic handler (upsert of order, line items, customer, checkout) for that `storeId`;
    - recompute the customer's aggregates from their orders.
-5. Any other error surfaces as `500` and Shopify retries with backoff.
+6. Any other error surfaces as `500` and Shopify retries with backoff.
 
 ### Guarantees
 
 | Real-world problem                      | Handling                                                        |
 | --------------------------------------- | --------------------------------------------------------------- |
 | Duplicate delivery (at-least-once)      | event log with PK = webhook id                                  |
-| Same order resent with a different id   | `upsert` by `shopifyId`                                         |
+| Same order resent with a different id   | `upsert` by `(storeId, shopifyId)`                              |
 | `orders/updated` before `orders/create` | `upsert` + `updated_at` guard (older events are ignored)        |
 | Refund / order edit                     | `current_total_price` + full recomputation of aggregates        |
 | Failure halfway through                 | transaction: all or nothing                                     |
@@ -47,6 +48,9 @@ processing) are in [`limitations.md`](limitations.md), items R1–R2.
 
 ## Data model
 
+- `stores` — one row per store: `DEMO` (seed data, id `demo`) or `SHOPIFY` (shop domain,
+  currency, encrypted webhook secret). Every table below has a `storeId`.
+- `checkouts` — Shopify checkouts; never completed = abandoned cart (items, value, recovery link).
 - `customers` — customer data + denormalized aggregates (`ordersCount`, `totalSpent`,
   `firstOrderAt`, `lastOrderAt`) with indexes on `lastOrderAt` and `totalSpent`.
 - `orders`, `order_line_items` — orders and items; `totalPrice` as `Decimal(12,2)`.
@@ -64,7 +68,16 @@ The **segment** is not stored because it depends on the current date. The rule l
 - `lib/session.ts` (Data Access Layer): `requireUser()` validates the session against the
   database. It is called in every page, Server Action and route that touches customer data. A
   forged cookie gets past the proxy, never past the DAL.
+- `lib/stores/current.ts`: `requireStoreContext()` = `requireUser()` + the current store (cookie
+  `oh_store`, re-validated in the database; unknown → demo store). Every query takes that `storeId`,
+  so an id from another store is "not found".
 - No public sign-up. GitHub OAuth only admits emails listed in `ALLOWED_EMAILS`.
+
+## Languages
+
+The UI is in English (default), Portuguese and Italian. Pages live under `app/[locale]`; URLs have
+no prefix because `proxy.ts` rewrites them from the `oh_locale` cookie. Dictionaries are typed
+(`lib/i18n`) and money is formatted with `Intl` in the store currency. See ADR 0007.
 
 ## Rendering (Cache Components)
 

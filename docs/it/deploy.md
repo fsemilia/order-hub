@@ -18,16 +18,16 @@
 1. https://vercel.com/new → importa il repository GitHub.
 2. **Environment Variables** (Production e Preview):
 
-   | Variabile                                                    | Valore                              |
-   | ------------------------------------------------------------ | ----------------------------------- |
-   | `DATABASE_URL`                                               | transaction pooler (6543)           |
-   | `DIRECT_URL`                                                 | session pooler / diretta (5432)     |
-   | `BETTER_AUTH_SECRET`                                         | `openssl rand -base64 32`           |
-   | `BETTER_AUTH_URL`                                            | `https://<tuo-progetto>.vercel.app` |
-   | `SHOPIFY_WEBHOOK_SECRET`                                     | vedi `shopify-setup.md`             |
-   | `ANTHROPIC_API_KEY`                                          | opzionale (abilita l'agente)        |
-   | `ALLOWED_EMAILS`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | opzionali                           |
-   | `DEMO_EMAIL`, `DEMO_PASSWORD`                                | utente demo creato dal seed         |
+   | Variabile                                                    | Valore                                                |
+   | ------------------------------------------------------------ | ----------------------------------------------------- |
+   | `DATABASE_URL`                                               | transaction pooler (6543)                             |
+   | `DIRECT_URL`                                                 | session pooler / diretta (5432)                       |
+   | `BETTER_AUTH_SECRET`                                         | `openssl rand -base64 32`                             |
+   | `BETTER_AUTH_URL`                                            | `https://<tuo-progetto>.vercel.app`                   |
+   | `STORE_SECRETS_KEY`                                          | `openssl rand -base64 32` (cifra i secret dei negozi) |
+   | `ANTHROPIC_API_KEY`                                          | opzionale (abilita l'agente)                          |
+   | `ALLOWED_EMAILS`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | opzionali                                             |
+   | `DEMO_EMAIL`, `DEMO_PASSWORD`                                | utente demo creato dal seed                           |
 
 3. Deploy. Il `buildCommand` è `npm run vercel-build` = `prisma migrate deploy && next build`: le
    migrazioni vengono applicate prima della build; se falliscono, il deploy fallisce e la versione
@@ -59,6 +59,18 @@ DATABASE_URL="<DIRECT_URL di Supabase>" DATABASE_POOL_MAX=5 npm run db:seed
 - Ogni Pull Request ha un **Preview Deployment**. Per tenere le preview lontane dai dati di
   produzione, usa un branch di Supabase o un database di staging nelle variabili _Preview_ (vedi
   [`limitations.md`](limitations.md), voce A4).
+
+## Aggiornare un deploy esistente al multi-negozio
+
+La migration `20261110000000_multi_store` sposta **tutte le righe esistenti** nel negozio demo
+(`demo`). È corretto quando il database contiene solo i dati del seed. Se contiene già ordini di un
+negozio reale, spostali prima di andare in produzione (un `UPDATE … SET "storeId" = '<id del nuovo
+negozio>'` per tabella, dopo aver collegato il negozio), altrimenti compaiono come dati demo.
+
+Ordine: (1) aggiungi `STORE_SECRETS_KEY` all'ambiente Vercel, (2) fai il deploy (la migration gira
+nel build), (3) collega subito il negozio dalla pagina Negozi con il suo secret di firma: fino ad
+allora i suoi webhook ricevono `401` e Shopify li ritenta. Rimuovi le variabili obsolete
+`SHOPIFY_WEBHOOK_SECRET` e `SHOPIFY_SHOP_DOMAIN`.
 
 ## Rollback
 
