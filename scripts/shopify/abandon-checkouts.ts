@@ -64,13 +64,20 @@ async function main() {
       const context = await browser.newContext({ locale: "pt-BR" });
       const page = await context.newPage();
       try {
-        if (password) {
-          await page.goto(`${base}/password`);
+        await page.goto(base, { waitUntil: "domcontentloaded" });
+        if (page.url().includes("/password")) {
+          if (!password) {
+            throw new Error(
+              "The storefront is password-protected: set SHOPIFY_STOREFRONT_PASSWORD " +
+                "(Shopify admin → Online Store → Preferences → Password protection).",
+            );
+          }
           const field = page.locator('input[type="password"]').first();
-          if (await field.isVisible().catch(() => false)) {
-            await field.fill(password);
-            await field.press("Enter");
-            await page.waitForLoadState("networkidle");
+          await field.fill(password);
+          await field.press("Enter");
+          await page.waitForLoadState("networkidle");
+          if (page.url().includes("/password")) {
+            throw new Error("Wrong SHOPIFY_STOREFRONT_PASSWORD: the storefront did not open.");
           }
         }
         const items = faker.helpers

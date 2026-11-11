@@ -62,7 +62,7 @@ o `npx` a baixa se não estiver instalada).
 ```bash
 # uma vez, em um terminal normal (abre o navegador para aprovar os escopos)
 npx @shopify/cli@5.0.1 store auth --store sitoweb1.myshopify.com \
-  --scopes write_products,write_customers,write_orders,read_publications,write_publications
+  --scopes write_products,write_customers,write_orders,write_draft_orders,read_publications,write_publications
 
 # produtos, clientes e pedidos retroativos (transações de teste, alguns reembolsados/pendentes/cancelados)
 npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orders 40
@@ -71,12 +71,17 @@ npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orde
 SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.myshopify.com --count 6
 ```
 
+- A moeda da loja no Order Hub deve ser a moeda da loja Shopify (o script a mostra, ex.: `EUR`):
+  os valores são formatados na moeda da loja.
 - Tudo recebe a tag `order-hub-demo`; produtos e clientes são reaproveitados ao rodar de novo.
 - Os e-mails dos clientes usam `@example.com` e nenhum recibo é enviado.
 - Os pedidos são criados com `test: true` e transações de teste: nenhum pagamento real.
 - Lojas de desenvolvimento aceitam **5 pedidos novos por minuto**: 40 pedidos levam ~9 minutos.
-- Os pedidos são retroativos via `processedAt`, que o Order Hub usa como data do pedido, para que
-  todos os segmentos (novo, recorrente, em risco) apareçam.
+- Pedidos: `orderCreate` (retroativo via `processedAt`, qualquer status financeiro) só funciona com
+  token **offline**. O token de `shopify store auth` é online, então o script usa **pedidos
+  rascunho concluídos como pagos, com data de hoje** (a Shopify não permite cancelá-los, então todos ficam pagos; cancele ou reembolse um à mão no admin para ver esses status).
+  Por isso os clientes aparecem como novos/recorrentes; o segmento "em risco" aparece na loja demo
+  (limitação D7).
 - Limites: [`limitations.md`](limitations.md), itens D5 e D6.
 
 ## Caminho B — app (como funcionaria em produção para muitos lojistas)

@@ -131,3 +131,30 @@ export function DemoBadge({ label }: { label: string }) {
     </span>
   );
 }
+
+const ORDER_STATUS_STYLES = {
+  paid: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950 dark:text-emerald-300",
+  pending: "bg-amber-50 text-amber-800 ring-amber-600/30 dark:bg-amber-950 dark:text-amber-300",
+  refunded: "bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-950 dark:text-sky-300",
+  cancelled: "bg-zinc-100 text-zinc-600 ring-zinc-500/20 dark:bg-zinc-800 dark:text-zinc-300",
+} as const;
+
+/** `label` comes from the dictionary (dict.orders.statuses[status]). */
+export function OrderStatusBadge({
+  status,
+  label,
+}: {
+  status: keyof typeof ORDER_STATUS_STYLES;
+  label: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+        ORDER_STATUS_STYLES[status],
+      )}
+    >
+      {label}
+    </span>
+  );
+}

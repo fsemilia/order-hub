@@ -63,7 +63,7 @@ Order Hub through the real webhooks (they use the [Shopify CLI](https://shopify.
 ```bash
 # once, in a normal terminal (opens the browser to approve the scopes)
 npx @shopify/cli@5.0.1 store auth --store sitoweb1.myshopify.com \
-  --scopes write_products,write_customers,write_orders,read_publications,write_publications
+  --scopes write_products,write_customers,write_orders,write_draft_orders,read_publications,write_publications
 
 # products, customers and backdated orders (test transactions, some refunded/pending/cancelled)
 npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orders 40
@@ -72,12 +72,17 @@ npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orde
 SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.myshopify.com --count 6
 ```
 
+- The currency of the store in Order Hub must be the shop currency (the script prints it, e.g.
+  `EUR`): amounts are formatted with the store currency.
 - Everything is tagged `order-hub-demo`; products and customers are reused on re-runs.
 - Customer emails use `@example.com` and receipts are not sent.
 - Orders are created with `test: true` and test transactions: no real payment.
 - Development stores accept **5 new orders per minute**: 40 orders take ~9 minutes.
-- Orders are backdated with `processedAt`, which Order Hub uses as the order date, so every
-  segment (new, returning, at risk) shows up.
+- Orders: `orderCreate` (backdated with `processedAt`, any financial status) only works with an
+  **offline** token. The token from `shopify store auth` is online, so the script falls back to
+  **draft orders completed as paid, dated today** (Shopify does not allow cancelling them, so they all stay paid; cancel or refund one by hand in the admin to see those statuses). Customers
+  therefore show up as new/returning; the "at risk" segment is visible in the demo store
+  (limitation D7).
 - Limits: [`limitations.md`](limitations.md), items D5 and D6.
 
 ## Path B — app (how it would work in production for many merchants)

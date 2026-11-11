@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { getStoreOverview } from "@/lib/crm/queries";
+import { getStoreOverview, listOrders } from "@/lib/crm/queries";
 import { getDictionary, isLocale, plural, t } from "@/lib/i18n";
-import { formatDate, formatMoney } from "@/lib/i18n/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/i18n/format";
+import { displayName } from "@/lib/i18n/names";
 import { getI18n } from "@/lib/i18n/server";
 import { requireStoreContext } from "@/lib/stores/current";
+import { AutoRefresh } from "@/components/auto-refresh";
 import {
   Card,
   EmptyState,
+  OrderStatusBadge,
   PageHeader,
   SegmentBadge,
   Skeleton,
@@ -24,7 +27,11 @@ export default async function DashboardPage() {
   const { dict } = await getI18n();
   return (
     <>
-      <PageHeader title={dict.dashboard.title} description={dict.dashboard.description} />
+      <PageHeader
+        title={dict.dashboard.title}
+        description={dict.dashboard.description}
+        actions={<AutoRefresh />}
+      />
       <Suspense fallback={<DashboardSkeleton />}>
         <Dashboard />
       </Suspense>
@@ -34,7 +41,10 @@ export default async function DashboardPage() {
 
 async function Dashboard() {
   const [{ store }, { locale, dict }] = await Promise.all([requireStoreContext(), getI18n()]);
-  const o = await getStoreOverview(store.id);
+  const [o, recent] = await Promise.all([
+    getStoreOverview(store.id),
+    listOrders(store.id, { limit: 8 }),
+  ]);
   const money = (cents: number) => formatMoney(cents, store.currency, locale);
   const d = dict.dashboard;
 
@@ -79,6 +89,40 @@ async function Dashboard() {
           }
         />
       </div>
+
+      <Card>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-semibold">{d.recentOrders}</h2>
+          <TextLink href="/orders" className="text-sm">
+            {d.viewAllOrders}
+          </TextLink>
+        </div>
+        {recent.rows.length === 0 ? (
+          <p className="mt-4 text-sm text-zinc-500">{d.noOrders}</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+            {recent.rows.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
+                <span className="w-20 font-medium">{r.name}</span>
+                <span className="w-36 text-zinc-500">{formatDateTime(r.placedAt, locale)}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {r.customer ? (
+                    <TextLink href={`/customers/${r.customer.id}`}>
+                      {displayName(r.customer, dict)}
+                    </TextLink>
+                  ) : (
+                    <span className="text-zinc-500">{dict.orders.guest}</span>
+                  )}
+                </span>
+                <OrderStatusBadge status={r.status} label={dict.orders.statuses[r.status]} />
+                <span className="tabular w-28 text-right font-medium">
+                  {formatMoney(r.totalCents, r.currency, locale)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

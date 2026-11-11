@@ -62,7 +62,7 @@ arrivano a Order Hub dai webhook reali (usano la [Shopify CLI](https://shopify.d
 ```bash
 # una volta, in un terminale normale (apre il browser per approvare gli scope)
 npx @shopify/cli@5.0.1 store auth --store sitoweb1.myshopify.com \
-  --scopes write_products,write_customers,write_orders,read_publications,write_publications
+  --scopes write_products,write_customers,write_orders,write_draft_orders,read_publications,write_publications
 
 # prodotti, clienti e ordini retrodatati (transazioni di test, alcuni rimborsati/in attesa/annullati)
 npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orders 40
@@ -71,12 +71,16 @@ npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orde
 SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.myshopify.com --count 6
 ```
 
+- La valuta del negozio in Order Hub deve essere quella del negozio Shopify (lo script la
+  stampa, es. `EUR`): gli importi sono formattati nella valuta del negozio.
 - Tutto ha il tag `order-hub-demo`; prodotti e clienti vengono riutilizzati se rilanci.
 - Le email dei clienti usano `@example.com` e non viene inviata nessuna ricevuta.
 - Gli ordini sono creati con `test: true` e transazioni di test: nessun pagamento reale.
 - I development store accettano **5 nuovi ordini al minuto**: 40 ordini richiedono ~9 minuti.
-- Gli ordini sono retrodatati con `processedAt`, che Order Hub usa come data dell'ordine, così
-  compaiono tutti i segmenti (nuovo, ricorrente, a rischio).
+- Ordini: `orderCreate` (retrodatato con `processedAt`, qualsiasi stato di pagamento) funziona solo
+  con un token **offline**. Il token di `shopify store auth` è online, quindi lo script usa **bozze
+  d'ordine completate come pagate, con data di oggi** (Shopify non permette di annullarle, quindi restano tutte pagate; annulla o rimborsa un ordine a mano dall'admin per vedere quegli stati). Per questo
+  i clienti risultano nuovi/ricorrenti; il segmento "a rischio" si vede nel negozio demo (limite D7).
 - Limiti: [`limitations.md`](limitations.md), voci D5 e D6.
 
 ## Percorso B — app (come funzionerebbe in produzione per molti merchant)

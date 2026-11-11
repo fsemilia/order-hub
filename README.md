@@ -32,6 +32,7 @@ calling, always returning drafts for human review.
 | **Authentication**   | Better Auth: email/password with no public sign-up + optional GitHub OAuth with an allowlist; login rate limit.                                                                                                                                                                                 |
 | **LGPD**             | `customers/redact` anonymizes the customer and keeps only the anonymous revenue history; the LLM never receives email or phone.                                                                                                                                                                 |
 | **Multi-store**      | Demo data and real Shopify stores side by side: per-store data and webhook secret (encrypted with AES-256-GCM), store switcher in the header, "Demo data / Real store" toggle at login, Stores page to connect stores.                                                                          |
+| **Orders**           | Live order feed (refreshes every 15 s) with status filter (paid, pending, refunded, cancelled), search by order number or customer, and the latest orders on the dashboard.                                                                                                                     |
 | **Abandoned carts**  | `checkouts/*` webhooks, list with recovery link, 7-day KPI on the dashboard, agent tool for recovery messages.                                                                                                                                                                                  |
 | **Languages**        | UI in English (default), Portuguese and Italian; money and dates formatted with `Intl` in the store currency; the agent answers in the UI language.                                                                                                                                             |
 
@@ -139,7 +140,7 @@ limit, two compliance webhooks only acknowledged, agent without automated evals,
 ```text
 app/
   [locale]/         root layout per language (en · pt-BR · it); URLs stay unprefixed (proxy.ts)
-    (app)/          authenticated pages: overview, customers, abandoned carts, agent, stores
+    (app)/          authenticated pages: overview, orders, customers, abandoned carts, agent, stores
     login/
   api/              Shopify webhooks, Better Auth, health check
 lib/

@@ -6,6 +6,7 @@ import {
   getStoreOverview,
   listAbandonedCheckouts,
   listCustomers,
+  listOrders,
 } from "@/lib/crm/queries";
 import { recomputeCustomerAggregates } from "@/lib/crm/aggregates";
 import { createTestStore, prisma, resetDb } from "../support/db";
@@ -150,5 +151,64 @@ describe("abandoned checkouts", () => {
     const o = await getStoreOverview(storeId, NOW);
     expect(o.abandoned7Count).toBe(2);
     expect(o.abandoned7Cents).toBe(20050);
+  });
+});
+
+describe("listOrders", () => {
+  async function order(name: string, daysAgo_: number, financialStatus: string, cancelled = false) {
+    const c = await prisma.customer.findFirstOrThrow({ where: { storeId, firstName: "Fiel" } });
+    await prisma.order.create({
+      data: {
+        storeId,
+        shopifyId: randomUUID(),
+        name,
+        customerId: c.id,
+        totalPrice: new Prisma.Decimal("10.00"),
+        currency: "BRL",
+        financialStatus,
+        placedAt: daysAgo(daysAgo_),
+        cancelledAt: cancelled ? daysAgo(daysAgo_) : null,
+        shopifyUpdatedAt: daysAgo(daysAgo_),
+        lineItems: {
+          create: { shopifyId: randomUUID(), title: "Sérum", quantity: 2, unitPrice: "5.00" },
+        },
+      },
+    });
+  }
+
+  beforeEach(async () => {
+    await order("#2001", 0, "paid");
+    await order("#2002", 0.5, "partially_refunded");
+    await order("#2003", 0.6, "refunded");
+    await order("#2004", 0.7, "pending");
+    await order("#2005", 0.8, "paid", true);
+  });
+
+  it("lists the store's orders, most recent first, with status and customer", async () => {
+    const { rows, total } = await listOrders(storeId, { limit: 3 });
+    expect(total).toBe(11); // 6 from the customers above + 5 here; never the other store's
+    expect(rows.map((r) => r.name)).toEqual(["#2001", "#2002", "#2003"]);
+    expect(rows[0]).toMatchObject({
+      status: "paid",
+      totalCents: 1000,
+      items: ["2× Sérum"],
+      customer: { name: "Fiel", redacted: false },
+    });
+  });
+
+  it.each([
+    ["paid", ["#2001"]],
+    ["refunded", ["#2002", "#2003"]],
+    ["pending", ["#2004"]],
+    ["cancelled", ["#2005"]],
+  ] as const)("filters status %s consistently with the badge", async (status, names) => {
+    const { rows } = await listOrders(storeId, { status, q: "#200" });
+    expect(rows.map((r) => r.name)).toEqual(names);
+    for (const r of rows) expect(r.status).toBe(status);
+  });
+
+  it("searches by order name and by customer", async () => {
+    expect((await listOrders(storeId, { q: "2004" })).rows.map((r) => r.name)).toEqual(["#2004"]);
+    expect((await listOrders(storeId, { q: "SUMIDA" })).total).toBe(2);
   });
 });

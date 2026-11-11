@@ -252,3 +252,107 @@ export async function listAbandonedCheckouts(storeId: string, limit = 50) {
     startedAt: c.startedAt,
   }));
 }
+
+// ── Orders ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * UI order status: "cancelled" wins, then "refunded" (full or partial; a partial refund still
+ * counts as revenue for LTV), then "paid", else "pending". Filter and badge use the same rule.
+ */
+const PAID = ["paid", "partially_paid"];
+const REFUNDED = ["refunded", "partially_refunded"];
+
+export const ORDER_STATUSES = ["paid", "pending", "refunded", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export function isOrderStatus(v: unknown): v is OrderStatus {
+  return typeof v === "string" && (ORDER_STATUSES as readonly string[]).includes(v);
+}
+
+export function orderStatusOf(o: {
+  financialStatus: string;
+  cancelledAt: Date | null;
+}): OrderStatus {
+  if (o.cancelledAt) return "cancelled";
+  if (REFUNDED.includes(o.financialStatus)) return "refunded";
+  if (PAID.includes(o.financialStatus)) return "paid";
+  return "pending";
+}
+
+function orderStatusWhere(status: OrderStatus): Prisma.OrderWhereInput {
+  switch (status) {
+    case "cancelled":
+      return { cancelledAt: { not: null } };
+    case "refunded":
+      return { cancelledAt: null, financialStatus: { in: REFUNDED } };
+    case "paid":
+      return { cancelledAt: null, financialStatus: { in: PAID } };
+    case "pending":
+      return { cancelledAt: null, financialStatus: { notIn: [...PAID, ...REFUNDED] } };
+  }
+}
+
+export type ListOrdersParams = { status?: OrderStatus; q?: string; page?: number; limit?: number };
+
+export type OrderRow = Awaited<ReturnType<typeof listOrders>>["rows"][number];
+
+/** Orders of one store, most recent first. Search by order name ("#1001") or customer. */
+export async function listOrders(storeId: string, params: ListOrdersParams = {}) {
+  const limit = params.limit ?? PAGE_SIZE;
+  const page = Math.max(1, params.page ?? 1);
+  const q = params.q?.trim();
+
+  const where: Prisma.OrderWhereInput = {
+    storeId,
+    ...(params.status ? orderStatusWhere(params.status) : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { customer: { email: { contains: q, mode: "insensitive" } } },
+            { customer: { firstName: { contains: q, mode: "insensitive" } } },
+            { customer: { lastName: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+
+  // Two independent reads, not a $transaction: the dashboard runs this next to the overview
+  // queries, and a batch transaction waits for a dedicated connection (P2028 on small pools).
+  // A count off by one while a webhook is being ingested is harmless for a list.
+  const [total, orders] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      orderBy: [{ placedAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, redactedAt: true } },
+        lineItems: { select: { title: true, quantity: true } },
+      },
+    }),
+  ]);
+
+  return {
+    total,
+    page,
+    pageCount: Math.max(1, Math.ceil(total / limit)),
+    rows: orders.map((o) => ({
+      id: o.id,
+      name: o.name,
+      placedAt: o.placedAt,
+      status: orderStatusOf(o),
+      totalCents: decimalToCents(o.totalPrice),
+      currency: o.currency,
+      items: o.lineItems.map((li) => `${li.quantity}× ${li.title}`),
+      customer: o.customer
+        ? {
+            id: o.customer.id,
+            name: [o.customer.firstName, o.customer.lastName].filter(Boolean).join(" ") || null,
+            redacted: Boolean(o.customer.redactedAt),
+          }
+        : null,
+    })),
+  };
+}
