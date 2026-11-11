@@ -87,9 +87,10 @@ export async function ingestOrder(
 
   // The order completes its checkout: the cart is no longer "abandoned", even if Shopify never
   // sends the checkouts/update with completed_at.
-  if (o.checkout_id) {
+  const checkoutKeys = [o.checkout_token, o.checkout_id].filter((k): k is string => !!k);
+  if (checkoutKeys.length > 0) {
     await tx.checkout.updateMany({
-      where: { storeId, shopifyId: o.checkout_id, completedAt: null },
+      where: { storeId, shopifyId: { in: checkoutKeys }, completedAt: null },
       data: { completedAt: data.placedAt },
     });
   }
@@ -125,7 +126,7 @@ export async function ingestCheckout(
   c: ShopifyCheckout,
 ) {
   const existing = await tx.checkout.findUnique({
-    where: key(storeId, c.id),
+    where: key(storeId, c.key),
     select: { id: true, shopifyUpdatedAt: true },
   });
   if (existing && existing.shopifyUpdatedAt > c.updated_at) {
@@ -154,8 +155,8 @@ export async function ingestCheckout(
     shopifyUpdatedAt: c.updated_at,
   };
   const checkout = await tx.checkout.upsert({
-    where: key(storeId, c.id),
-    create: { storeId, shopifyId: c.id, ...data },
+    where: key(storeId, c.key),
+    create: { storeId, shopifyId: c.key, ...data },
     update: data,
   });
   return { status: "upserted" as const, checkoutId: checkout.id };
