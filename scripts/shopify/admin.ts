@@ -75,8 +75,11 @@ export function createAdmin(store: string) {
         return (JSON.parse(out.slice(out.indexOf("{"))) as GraphQLResult<T>).data;
       } catch (e) {
         const err = e as { stderr?: string; stdout?: string };
-        detail = err.stderr || err.stdout || String(e);
+        // stdout carries the GraphQL error document, stderr the progress events: keep both.
+        detail = [err.stdout, err.stderr].filter(Boolean).join("\n") || String(e);
       }
+      // A GraphQL error (access denied, invalid input…) is deterministic: never retry it.
+      if (isGraphQLError(detail)) throw new ShopifyGraphQLError(detail);
       if (attempt >= ATTEMPTS) {
         throw new Error(
           `shopify store execute failed ${ATTEMPTS} times:\n${detail}\n` +
@@ -113,6 +116,23 @@ export function assertNoUserErrors(
     throw new Error(
       `${label}: ${errors.map((e) => `${e.field?.join(".") ?? ""} ${e.message}`).join("; ")}`,
     );
+  }
+}
+
+/** Shopify answered with a GraphQL error (as opposed to the CLI timing out). */
+export function isGraphQLError(output: string) {
+  return /GraphQL operation failed|"errors":\s*\[|ACCESS_DENIED/.test(output);
+}
+
+export class ShopifyGraphQLError extends Error {
+  constructor(public readonly detail: string) {
+    // The first GraphQL error message (the one followed by "locations"), compact or pretty JSON
+    const m = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"locations"/.exec(detail);
+    super(m ? JSON.parse(`"${m[1]}"`) : detail.slice(0, 500));
+  }
+  /** orderCreate is only available to apps with offline tokens (not `shopify store auth`). */
+  get needsOfflineToken() {
+    return /offline tokens/i.test(this.detail);
   }
 }
 

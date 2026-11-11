@@ -1,0 +1,33 @@
+{
+  "error": {
+    "type": "abort",
+    "message": "GraphQL operation failed.",
+    "tryMessage": "{\n  \"errors\": [\n    {\n      \"message\": \"Access denied for orderCreate field. Required access: `write_orders` access scope. Also: This mutation is only accessible to apps authenticated using [offline tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/offline-access-tokens).\",\n      \"locations\": [\n        {\n          \"line\": 2,\n          \"column\": 3\n        }\n      ],\n      \"extensions\": {\n        \"code\": \"ACCESS_DENIED\",\n        \"documentation\": \"https://shopify.dev/api/usage/access-scopes\",\n        \"requiredAccess\": \"`write_orders` access scope. Also: This mutation is only accessible to apps authenticated using [offline tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/offline-access-tokens).\"\n      },\n      \"path\": [\n        \"orderCreate\"\n      ]\n    }\n  ]\n}",
+    "details": {
+      "errors": [
+        {
+          "message": "Access denied for orderCreate field. Required access: `write_orders` access scope. Also: This mutation is only accessible to apps authenticated using [offline tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/offline-access-tokens).",
+          "locations": [{ "line": 2, "column": 3 }],
+          "extensions": {
+            "code": "ACCESS_DENIED",
+            "documentation": "https://shopify.dev/api/usage/access-scopes",
+            "requiredAccess": "`write_orders` access scope. Also: This mutation is only accessible to apps authenticated using [offline tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/offline-access-tokens)."
+          },
+          "path": ["orderCreate"]
+        }
+      ],
+      "extensions": {
+        "cost": {
+          "requestedQueryCost": 10,
+          "actualQueryCost": 10,
+          "throttleStatus": {
+            "maximumAvailable": 2000,
+            "currentlyAvailable": 1990,
+            "restoreRate": 100
+          }
+        }
+      },
+      "data": { "orderCreate": null }
+    }
+  }
+}

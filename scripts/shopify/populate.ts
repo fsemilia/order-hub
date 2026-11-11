@@ -7,20 +7,31 @@
  *
  * Prerequisites (see docs/en/shopify-setup.md):
  *   shopify store auth --store sitoweb1.myshopify.com \
- *     --scopes write_products,write_customers,write_orders,read_publications,write_publications
+ *     --scopes write_products,write_customers,write_orders,write_draft_orders,read_publications,write_publications
  *
  * Safe to re-run: everything is tagged "order-hub-demo"; products and customers that already exist
  * are reused (orders are always new). Customer emails use @example.com: nobody receives anything,
  * and receipts are not sent (sendReceipt: false).
  *
  * Development/trial stores accept at most 5 new orders per minute: the script paces itself.
+ *
+ * Orders: `orderCreate` (backdated, any financial status) requires an OFFLINE token, which
+ * `shopify store auth` does not provide. The script tries it and otherwise falls back to draft
+ * orders completed as paid, dated today (limitation D7).
  */
 import { fakerPT_BR as faker } from "@faker-js/faker";
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { centsToPrice, priceToCents } from "../../lib/money";
 import { normalizeShopDomain } from "../../lib/stores/domain";
-import { assertNoUserErrors, createAdmin, sleep, sleepSync, type Admin } from "./admin";
+import {
+  assertNoUserErrors,
+  createAdmin,
+  ShopifyGraphQLError,
+  sleep,
+  sleepSync,
+  type Admin,
+} from "./admin";
 
 const TAG = "order-hub-demo";
 const ONLINE_STORE_NAMES =
@@ -239,6 +250,10 @@ async function createOrders(
 ) {
   const plan = orderPlan(customers, total);
   let created = 0;
+  // "order": orderCreate (backdated, any financial status) needs an OFFLINE token. A token from
+  // `shopify store auth` is online, so we fall back to "draft": draftOrderCreate + draftOrderComplete
+  // (paid, dated today). Cancellations still provide refunded/voided orders.
+  let mode: "order" | "draft" = "order";
   for (const { customer, daysAgo } of plan) {
     const items = faker.helpers.arrayElements(variants, { min: 1, max: 3 }).map((v) => ({
       variant: v,
@@ -284,41 +299,40 @@ async function createOrders(
           }),
     };
 
-    const res = await withRetry(() =>
-      admin.execute<{
-        orderCreate: {
-          order: { id: string; name: string } | null;
-          userErrors: { field: string[] | null; message: string }[];
-        };
-      }>(
-        `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
-           orderCreate(order: $order, options: $options) {
-             order { id name } userErrors { field message } } }`,
-        { order, options: { sendReceipt: false, sendFulfillmentReceipt: false } },
-        {
-          mutation: true,
-          recover: () => {
-            // Order search is eventually consistent: look a few times before declaring "not applied"
-            for (let i = 0; i < 4; i++) {
-              const found = admin.execute<{ orders: { nodes: { id: string; name: string }[] } }>(
-                `query($q: String!) { orders(first: 1, query: $q) { nodes { id name } } }`,
-                { q: `tag:${runTag}` },
-              ).orders.nodes[0];
-              if (found) return { orderCreate: { order: found, userErrors: [] } };
-              sleepSync(5_000);
-            }
-            return null;
-          },
-        },
-      ),
-    );
-    assertNoUserErrors("orderCreate", res.orderCreate.userErrors);
-    const created_ = res.orderCreate.order!;
+    let created_: { id: string; name: string } | null = null;
+    if (mode === "order") {
+      try {
+        created_ = await withRetry(() => createOrder(admin, order, runTag));
+      } catch (e) {
+        if (!(e instanceof ShopifyGraphQLError && e.needsOfflineToken)) throw e;
+        mode = "draft";
+        console.warn(
+          "  ! orderCreate needs an offline token (not available with `shopify store auth`):\n" +
+            "    switching to draft orders, completed as paid and dated TODAY (no backdating).",
+        );
+      }
+    }
+    if (mode === "draft") {
+      created_ = await withRetry(() =>
+        createViaDraft(admin, {
+          email: customer.email,
+          customerId: customer.id,
+          tags: [TAG, runTag],
+          lineItems: order.lineItems,
+        }),
+      );
+    }
+    if (!created_) throw new Error("order was not created");
     created++;
-    console.log(`  + order ${created_.name} ${status} ${amount} ${currency} (${daysAgo}d ago)`);
+    const shownStatus = mode === "order" ? status : "PAID";
+    const when = mode === "order" ? `${daysAgo}d ago` : "today";
+    console.log(`  + order ${created_.name} ${shownStatus} ${amount} ${currency} (${when})`);
 
-    // ~8% of paid orders are cancelled afterwards (orders/cancelled webhook)
-    if (status === "PAID" && faker.datatype.boolean(0.08)) {
+    // Some paid orders are cancelled with a refund afterwards (orders/cancelled webhook).
+    // In draft mode this is the only source of refunded orders, so it happens more often.
+    const cancelRate = mode === "order" ? 0.08 : 0.15;
+    const order_ = created_;
+    if (shownStatus === "PAID" && faker.datatype.boolean(cancelRate)) {
       try {
         const c = admin.execute<{
           orderCancel: { orderCancelUserErrors: { field: string[] | null; message: string }[] };
@@ -327,24 +341,24 @@ async function createOrders(
            orderCancel(orderId: $orderId, reason: CUSTOMER, restock: true, notifyCustomer: false,
              refundMethod: { originalPaymentMethodsRefund: true }) {
              orderCancelUserErrors { field message } } }`,
-          { orderId: created_.id },
+          { orderId: order_.id },
           {
             mutation: true,
             recover: () => {
               const o = admin.execute<{ order: { cancelledAt: string | null } | null }>(
                 `query($id: ID!) { order(id: $id) { cancelledAt } }`,
-                { id: created_.id },
+                { id: order_.id },
               ).order;
               return o?.cancelledAt ? { orderCancel: { orderCancelUserErrors: [] } } : null;
             },
           },
         );
         assertNoUserErrors("orderCancel", c.orderCancel.orderCancelUserErrors);
-        console.log(`    ↳ cancelled ${created_.name}`);
+        console.log(`    ↳ cancelled ${order_.name}`);
       } catch (e) {
         // Not worth stopping the whole run: the order simply stays paid.
         console.warn(
-          `    ! could not cancel ${created_.name}: ${e instanceof Error ? e.message.split("\n")[0] : e}`,
+          `    ! could not cancel ${order_.name}: ${e instanceof Error ? e.message.split("\n")[0] : e}`,
         );
       }
     }
@@ -353,6 +367,109 @@ async function createOrders(
     if (created < plan.length) await sleep(12_500);
   }
   return created;
+}
+
+type UserErrors = { field: string[] | null; message: string }[];
+
+function createOrder(admin: Admin, order: Record<string, unknown>, runTag: string) {
+  const res = admin.execute<{
+    orderCreate: { order: { id: string; name: string } | null; userErrors: UserErrors };
+  }>(
+    `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
+       orderCreate(order: $order, options: $options) {
+         order { id name } userErrors { field message } } }`,
+    { order, options: { sendReceipt: false, sendFulfillmentReceipt: false } },
+    {
+      mutation: true,
+      recover: () => {
+        const found = findOrderByTag(admin, runTag);
+        return found ? { orderCreate: { order: found, userErrors: [] } } : null;
+      },
+    },
+  );
+  assertNoUserErrors("orderCreate", res.orderCreate.userErrors);
+  return res.orderCreate.order!;
+}
+
+/** Order search is eventually consistent: look a few times before declaring "not applied". */
+function findOrderByTag(admin: Admin, tag: string) {
+  for (let i = 0; i < 4; i++) {
+    const found = admin.execute<{ orders: { nodes: { id: string; name: string }[] } }>(
+      `query($q: String!) { orders(first: 1, query: $q) { nodes { id name } } }`,
+      { q: `tag:${tag}` },
+    ).orders.nodes[0];
+    if (found) return found;
+    sleepSync(5_000);
+  }
+  return null;
+}
+
+function createViaDraft(
+  admin: Admin,
+  input: {
+    email: string;
+    customerId: string;
+    tags: string[];
+    lineItems: { variantId: string; quantity: number }[];
+  },
+) {
+  const runTag = input.tags[input.tags.length - 1]!;
+  const draft = admin.execute<{
+    draftOrderCreate: { draftOrder: { id: string } | null; userErrors: UserErrors };
+  }>(
+    `mutation($input: DraftOrderInput!) {
+       draftOrderCreate(input: $input) { draftOrder { id } userErrors { field message } } }`,
+    {
+      input: {
+        email: input.email,
+        purchasingEntity: { customerId: input.customerId },
+        tags: input.tags,
+        lineItems: input.lineItems,
+        note: "Order Hub demo data (test order)",
+      },
+    },
+    {
+      mutation: true,
+      recover: () => {
+        const d = admin.execute<{ draftOrders: { nodes: { id: string }[] } }>(
+          `query($q: String!) { draftOrders(first: 1, query: $q) { nodes { id } } }`,
+          { q: `tag:${runTag}` },
+        ).draftOrders.nodes[0];
+        return d ? { draftOrderCreate: { draftOrder: d, userErrors: [] } } : null;
+      },
+    },
+  );
+  assertNoUserErrors("draftOrderCreate", draft.draftOrderCreate.userErrors);
+  const draftId = draft.draftOrderCreate.draftOrder!.id;
+
+  // Completing a draft creates a real order marked as paid (manual payment, no money moves).
+  const done = admin.execute<{
+    draftOrderComplete: {
+      draftOrder: { order: { id: string; name: string } | null } | null;
+      userErrors: UserErrors;
+    };
+  }>(
+    `mutation($id: ID!) {
+       draftOrderComplete(id: $id) {
+         draftOrder { order { id name } } userErrors { field message } } }`,
+    { id: draftId },
+    {
+      mutation: true,
+      recover: () => {
+        const d = admin.execute<{ draftOrder: { order: { id: string; name: string } | null } }>(
+          `query($id: ID!) { draftOrder(id: $id) { order { id name } } }`,
+          { id: draftId },
+        ).draftOrder;
+        return d?.order
+          ? { draftOrderComplete: { draftOrder: { order: d.order }, userErrors: [] } }
+          : null;
+      },
+    },
+  );
+  assertNoUserErrors("draftOrderComplete", done.draftOrderComplete.userErrors);
+  const order = done.draftOrderComplete.draftOrder?.order;
+  if (!order) throw new Error("draftOrderComplete returned no order");
+  return order;
 }
 
 async function withRetry<T>(fn: () => T, attempts = 4): Promise<T> {
