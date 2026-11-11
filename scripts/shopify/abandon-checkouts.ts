@@ -75,7 +75,10 @@ async function main() {
           const field = page.locator('input[type="password"]').first();
           await field.fill(password);
           await field.press("Enter");
-          await page.waitForLoadState("networkidle");
+          // Not "networkidle": a storefront never goes idle (analytics, pixels keep polling).
+          await page
+            .waitForURL((u) => !u.pathname.startsWith("/password"), { timeout: 30_000 })
+            .catch(() => {});
           if (page.url().includes("/password")) {
             throw new Error("Wrong SHOPIFY_STOREFRONT_PASSWORD: the storefront did not open.");
           }
@@ -90,7 +93,9 @@ async function main() {
             ? faker.helpers.arrayElement(emails)
             : faker.internet.email({ provider: "example.com" }).toLowerCase();
         const url = `${base}/cart/${items}?checkout[email]=${encodeURIComponent(email)}`;
-        await page.goto(url, { waitUntil: "networkidle", timeout: 60_000 });
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        // The cart permalink redirects to the checkout: wait for that URL, not for network idle
+        await page.waitForURL(/\/checkouts?\//, { timeout: 45_000 }).catch(() => {});
 
         if (!/\/checkouts?\//.test(page.url())) {
           console.warn(`  ! did not reach checkout (${page.url()}): storefront password?`);
