@@ -12,8 +12,8 @@ First stable release, live at <https://order-hub-lime.vercel.app>.
 ### Shopify ingestion
 
 - Signed Shopify webhooks (`orders/*`, `customers/*`, `checkouts/*` and the `customers/redact`
-  compliance topic) verified
-  with HMAC over the raw body, per-store secrets encrypted at rest (AES-256-GCM).
+  compliance topic) verified with HMAC over the raw body, per-store secrets encrypted at rest
+  (AES-256-GCM).
 - One transaction per delivery: idempotency log + upserts; duplicates acknowledged, invalid
   payloads rejected with 422 and rolled back so Shopify's retries can be replayed.
 - Stale-update guard on `updated_at`; payloads validated with Zod against API version 2026-10
