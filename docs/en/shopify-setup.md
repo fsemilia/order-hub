@@ -83,6 +83,11 @@ SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.my
   **draft orders completed as paid, dated today** (Shopify does not allow cancelling them, so they all stay paid; cancel or refund one by hand in the admin to see those statuses). Customers
   therefore show up as new/returning; the "at risk" segment is visible in the demo store
   (limitation D7).
+- **Recovery links on a password-protected store**: a development store keeps the storefront
+  password on. Opening a cart's recovery link (Abandoned carts → _Open link_) in a browser that has
+  not entered it yet redirects to the home page, then to the password page, and after the password
+  Shopify stays on the home page. Enter the password once, then open the same link again: it goes
+  straight to the checkout with the cart's products. A live store without a password has no such step.
 - Limits: [`limitations.md`](limitations.md), items D5 and D6.
 
 ## Path B — app (how it would work in production for many merchants)
@@ -110,11 +115,12 @@ npm run webhook:send -- --topic checkouts/create --fixture tests/fixtures/checko
 
 ## Troubleshooting
 
-| Symptom                           | Likely cause                                                                                                                 |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `401 invalid signature`           | store not added in Order Hub, domain different from `X-Shopify-Shop-Domain`, or wrong/rotated secret (update it on the card) |
-| Every store returns 401           | `STORE_SECRETS_KEY` changed: secrets must be re-entered (limitation R7)                                                      |
-| Order without customer name/email | missing _protected customer data_ access (Path B)                                                                            |
-| `422 invalid payload`             | different API version with new/missing fields; check the `webhook.invalid_payload` log and adjust `lib/shopify/schemas.ts`   |
-| No abandoned carts                | checkout webhooks not created, or the cart never reached the checkout contact step                                           |
-| Shopify disabled the webhook      | the endpoint failed repeatedly (status ≠ 2xx); fix it and recreate the subscription                                          |
+| Symptom                                 | Likely cause                                                                                                                 |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `401 invalid signature`                 | store not added in Order Hub, domain different from `X-Shopify-Shop-Domain`, or wrong/rotated secret (update it on the card) |
+| Every store returns 401                 | `STORE_SECRETS_KEY` changed: secrets must be re-entered (limitation R7)                                                      |
+| Order without customer name/email       | missing _protected customer data_ access (Path B)                                                                            |
+| `422 invalid payload`                   | different API version with new/missing fields; check the `webhook.invalid_payload` log and adjust `lib/shopify/schemas.ts`   |
+| No abandoned carts                      | checkout webhooks not created, or the cart never reached the checkout contact step                                           |
+| Recovery link opens the store home page | storefront password protection (development stores): enter the password, then open the link again                            |
+| Shopify disabled the webhook            | the endpoint failed repeatedly (status ≠ 2xx); fix it and recreate the subscription                                          |

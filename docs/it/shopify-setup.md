@@ -81,6 +81,12 @@ SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.my
   con un token **offline**. Il token di `shopify store auth` è online, quindi lo script usa **bozze
   d'ordine completate come pagate, con data di oggi** (Shopify non permette di annullarle, quindi restano tutte pagate; annulla o rimborsa un ordine a mano dall'admin per vedere quegli stati). Per questo
   i clienti risultano nuovi/ricorrenti; il segmento "a rischio" si vede nel negozio demo (limite D7).
+- **Link di recupero su un negozio protetto da password**: un development store tiene attiva la
+  password della vetrina. Aprire il link di recupero di un carrello (Carrelli abbandonati → _Apri
+  link_) in un browser che non l'ha ancora inserita reindirizza alla home, poi alla pagina della
+  password, e dopo la password Shopify resta sulla home. Inserisci la password una volta, poi apri
+  di nuovo lo stesso link: porta direttamente al checkout con i prodotti del carrello. Un negozio
+  pubblicato senza password non ha questo passaggio.
 - Limiti: [`limitations.md`](limitations.md), voci D5 e D6.
 
 ## Percorso B — app (come funzionerebbe in produzione per molti merchant)
@@ -108,11 +114,12 @@ npm run webhook:send -- --topic checkouts/create --fixture tests/fixtures/checko
 
 ## Risoluzione dei problemi
 
-| Sintomo                           | Causa probabile                                                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `401 invalid signature`           | negozio non aggiunto in Order Hub, dominio diverso da `X-Shopify-Shop-Domain` o secret errato/ruotato (aggiornalo)       |
-| Tutti i negozi rispondono 401     | `STORE_SECRETS_KEY` è cambiata: i secret vanno reinseriti (limite R7)                                                    |
-| Ordine senza nome/email           | manca l'accesso a _protected customer data_ (Percorso B)                                                                 |
-| `422 invalid payload`             | versione API diversa con campi nuovi/mancanti; guarda il log `webhook.invalid_payload` e adegua `lib/shopify/schemas.ts` |
-| Nessun carrello abbandonato       | webhook dei checkout non creati, oppure il carrello non è mai arrivato al passo contatti del checkout                    |
-| Shopify ha disattivato il webhook | l'endpoint ha fallito ripetutamente (stato ≠ 2xx); correggi e ricrea la sottoscrizione                                   |
+| Sintomo                                      | Causa probabile                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `401 invalid signature`                      | negozio non aggiunto in Order Hub, dominio diverso da `X-Shopify-Shop-Domain` o secret errato/ruotato (aggiornalo)       |
+| Tutti i negozi rispondono 401                | `STORE_SECRETS_KEY` è cambiata: i secret vanno reinseriti (limite R7)                                                    |
+| Ordine senza nome/email                      | manca l'accesso a _protected customer data_ (Percorso B)                                                                 |
+| `422 invalid payload`                        | versione API diversa con campi nuovi/mancanti; guarda il log `webhook.invalid_payload` e adegua `lib/shopify/schemas.ts` |
+| Nessun carrello abbandonato                  | webhook dei checkout non creati, oppure il carrello non è mai arrivato al passo contatti del checkout                    |
+| Il link di recupero apre la home del negozio | protezione con password della vetrina (development store): inserisci la password, poi riapri il link                     |
+| Shopify ha disattivato il webhook            | l'endpoint ha fallito ripetutamente (stato ≠ 2xx); correggi e ricrea la sottoscrizione                                   |

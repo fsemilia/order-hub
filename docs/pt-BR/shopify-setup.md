@@ -82,6 +82,11 @@ SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.my
   rascunho concluídos como pagos, com data de hoje** (a Shopify não permite cancelá-los, então todos ficam pagos; cancele ou reembolse um à mão no admin para ver esses status).
   Por isso os clientes aparecem como novos/recorrentes; o segmento "em risco" aparece na loja demo
   (limitação D7).
+- **Links de recuperação em uma loja com senha**: uma loja de desenvolvimento mantém a senha da
+  vitrine ativa. Abrir o link de recuperação de um carrinho (Carrinhos abandonados → _Abrir link_)
+  em um navegador que ainda não informou a senha redireciona para a home, depois para a página da
+  senha, e após a senha a Shopify fica na home. Informe a senha uma vez e abra o mesmo link de novo:
+  ele vai direto ao checkout com os produtos do carrinho. Uma loja publicada sem senha não tem essa etapa.
 - Limites: [`limitations.md`](limitations.md), itens D5 e D6.
 
 ## Caminho B — app (como funcionaria em produção para muitos lojistas)
@@ -109,11 +114,12 @@ npm run webhook:send -- --topic checkouts/create --fixture tests/fixtures/checko
 
 ## Solução de problemas
 
-| Sintoma                       | Causa provável                                                                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `401 invalid signature`       | loja não adicionada no Order Hub, domínio diferente de `X-Shopify-Shop-Domain` ou segredo errado/rotacionado (atualize-o) |
-| Todas as lojas retornam 401   | a `STORE_SECRETS_KEY` mudou: os segredos precisam ser informados de novo (limitação R7)                                   |
-| Pedido sem nome/e-mail        | falta o acesso a _protected customer data_ (Caminho B)                                                                    |
-| `422 invalid payload`         | versão de API diferente com campos novos/ausentes; veja o log `webhook.invalid_payload` e ajuste `lib/shopify/schemas.ts` |
-| Nenhum carrinho abandonado    | webhooks de checkout não criados, ou o carrinho nunca chegou à etapa de contato do checkout                               |
-| A Shopify desativou o webhook | o endpoint falhou repetidamente (status ≠ 2xx); corrija e recrie a assinatura                                             |
+| Sintoma                                   | Causa provável                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `401 invalid signature`                   | loja não adicionada no Order Hub, domínio diferente de `X-Shopify-Shop-Domain` ou segredo errado/rotacionado (atualize-o) |
+| Todas as lojas retornam 401               | a `STORE_SECRETS_KEY` mudou: os segredos precisam ser informados de novo (limitação R7)                                   |
+| Pedido sem nome/e-mail                    | falta o acesso a _protected customer data_ (Caminho B)                                                                    |
+| `422 invalid payload`                     | versão de API diferente com campos novos/ausentes; veja o log `webhook.invalid_payload` e ajuste `lib/shopify/schemas.ts` |
+| Nenhum carrinho abandonado                | webhooks de checkout não criados, ou o carrinho nunca chegou à etapa de contato do checkout                               |
+| O link de recuperação abre a home da loja | proteção por senha da vitrine (lojas de desenvolvimento): informe a senha e abra o link de novo                           |
+| A Shopify desativou o webhook             | o endpoint falhou repetidamente (status ≠ 2xx); corrija e recrie a assinatura                                             |
