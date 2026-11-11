@@ -66,8 +66,7 @@ test("a /<locale> link switches language and keeps unprefixed URLs", async ({ pa
   await expect(page).toHaveURL(/\/customers$/);
   await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
 
-  await page.waitForLoadState("networkidle"); // wait for hydration of the switcher
-  await page.getByLabel("Idioma").selectOption("it");
+  await page.getByLabel("Idioma").selectOption("it"); // waits until hydrated (enabled)
   await expect(page.getByRole("heading", { name: "Clienti" })).toBeVisible();
   // money follows the UI locale, currency follows the store (BRL)
   await expect(page.locator("tbody td").filter({ hasText: "R$" }).first()).toBeVisible();

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useI18n } from "@/components/i18n-provider";
 import { buttonStyles, Card, cn, inputStyles } from "@/components/ui";
+import { useHydrated } from "@/components/use-hydrated";
 import { chooseDataSource } from "../preferences";
 
 type DataSource = "demo" | "real";
@@ -23,6 +24,7 @@ export function LoginForm({ githubEnabled }: { githubEnabled: boolean }) {
   const [source, setSource] = useState<DataSource>("demo");
   const [error, setError] = useState<string | null>(params.get("error") ? l.unauthorized : null);
   const [pending, startTransition] = useTransition();
+  const hydrated = useHydrated();
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -69,6 +71,7 @@ export function LoginForm({ githubEnabled }: { githubEnabled: boolean }) {
                   name="source"
                   value={o.value}
                   checked={source === o.value}
+                  disabled={!hydrated}
                   onChange={() => setSource(o.value)}
                   className="sr-only"
                 />
@@ -111,7 +114,12 @@ export function LoginForm({ githubEnabled }: { githubEnabled: boolean }) {
             {error}
           </p>
         )}
-        <button type="submit" disabled={pending} className={`${buttonStyles.primary} w-full`}>
+        {/* Disabled until hydrated: the action is a client function, a click before it is lost */}
+        <button
+          type="submit"
+          disabled={pending || !hydrated}
+          className={`${buttonStyles.primary} w-full`}
+        >
           {pending ? l.submitting : l.submit}
         </button>
       </form>
@@ -123,6 +131,7 @@ export function LoginForm({ githubEnabled }: { githubEnabled: boolean }) {
           </div>
           <button
             type="button"
+            disabled={!hydrated}
             className={`${buttonStyles.secondary} w-full`}
             onClick={() =>
               authClient.signIn.social({

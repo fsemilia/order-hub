@@ -24,17 +24,19 @@ test("wrong password shows an error", async ({ page }) => {
 
 test("the login page can switch language before signing in", async ({ page }) => {
   await page.goto("/login");
-  await page.waitForLoadState("networkidle"); // the switcher is a client component: wait for hydration
+  // selectOption waits for the switcher to be enabled, i.e. hydrated (components/use-hydrated.ts)
   await page.getByLabel("Language").selectOption("it");
   await expect(page.getByRole("heading", { name: "Accedi alla dashboard" })).toBeVisible();
-  await page.waitForLoadState("networkidle");
   await page.getByLabel("Lingua").selectOption("en");
   await expect(page.getByRole("heading", { name: "Sign in to the dashboard" })).toBeVisible();
 });
 
 test("choosing 'Real store' at login opens a real store or the Stores page", async ({ page }) => {
   await page.goto("/login");
+  // The toggle is disabled until hydration (a click before it would be lost): wait for it.
+  await expect(page.getByRole("radio", { name: "Real store" })).toBeEnabled();
   await page.getByText("Real store", { exact: true }).click();
+  await expect(page.getByRole("radio", { name: "Real store" })).toBeChecked();
   await signIn(page);
   // With no Shopify store connected (CI) the user lands on /stores to connect one.
   await expect(async () => {

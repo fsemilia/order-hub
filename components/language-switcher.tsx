@@ -5,10 +5,12 @@ import { setLocale } from "@/app/[locale]/preferences";
 import { LOCALE_NAMES, LOCALES } from "@/lib/i18n/config";
 import { cn } from "@/components/ui";
 import { useI18n } from "./i18n-provider";
+import { useHydrated } from "./use-hydrated";
 
 export function LanguageSwitcher({ className }: { className?: string }) {
   const { locale, dict } = useI18n();
   const [pending, startTransition] = useTransition();
+  const hydrated = useHydrated();
 
   return (
     <label className={cn("flex items-center gap-1.5 text-xs text-zinc-500", className)}>
@@ -18,7 +20,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         // no browser form restoration on reload: the value must come from the server
         autoComplete="off"
         value={locale}
-        disabled={pending}
+        disabled={pending || !hydrated}
         onChange={(e) => {
           const next = e.target.value;
           startTransition(async () => {
