@@ -72,6 +72,8 @@ npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orde
 SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.myshopify.com --count 6
 ```
 
+- The currency of the store in Order Hub must be the shop currency (the script prints it, e.g.
+  `EUR`): amounts are formatted with the store currency.
 - Everything is tagged `order-hub-demo`; products and customers are reused on re-runs.
 - Customer emails use `@example.com` and receipts are not sent.
 - Orders are created with `test: true` and test transactions: no real payment.

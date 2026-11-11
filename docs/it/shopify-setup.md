@@ -71,6 +71,8 @@ npm run shopify:populate -- --store sitoweb1.myshopify.com --customers 25 --orde
 SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.myshopify.com --count 6
 ```
 
+- La valuta del negozio in Order Hub deve essere quella del negozio Shopify (lo script la
+  stampa, es. `EUR`): gli importi sono formattati nella valuta del negozio.
 - Tutto ha il tag `order-hub-demo`; prodotti e clienti vengono riutilizzati se rilanci.
 - Le email dei clienti usano `@example.com` e non viene inviata nessuna ricevuta.
 - Gli ordini sono creati con `test: true` e transazioni di test: nessun pagamento reale.

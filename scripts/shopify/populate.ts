@@ -22,6 +22,8 @@ import { normalizeShopDomain } from "../../lib/stores/domain";
 import { assertNoUserErrors, createAdmin, sleep, type Admin } from "./admin";
 
 const TAG = "order-hub-demo";
+const ONLINE_STORE_NAMES =
+  /^(online store|negozio online|loja virtual|tienda online|boutique en ligne|onlineshop|online-shop)$/i;
 const DAY = 86_400_000;
 
 const { values } = parseArgs({
@@ -51,10 +53,16 @@ type Variant = { id: string; price: string; title: string };
 
 async function ensureProducts(admin: Admin): Promise<Variant[]> {
   const existing = admin.execute<{
-    products: { nodes: { title: string; variants: { nodes: { id: string; price: string }[] } }[] };
+    products: {
+      nodes: {
+        id: string;
+        title: string;
+        variants: { nodes: { id: string; price: string }[] };
+      }[];
+    };
   }>(
     `query($q: String!) { products(first: 50, query: $q) {
-       nodes { title variants(first: 1) { nodes { id price } } } } }`,
+       nodes { id title variants(first: 1) { nodes { id price } } } } }`,
     { q: `tag:${TAG}` },
   ).products.nodes;
 
@@ -62,13 +70,30 @@ async function ensureProducts(admin: Admin): Promise<Variant[]> {
     .execute<{ publications: { nodes: { id: string; name: string }[] } }>(
       `{ publications(first: 20) { nodes { id name } } }`,
     )
-    .publications.nodes.find((p) => p.name === "Online Store");
+    // The name follows the admin language ("Online Store", "Negozio online", "Loja virtual"…)
+    .publications.nodes.find((p) => ONLINE_STORE_NAMES.test(p.name));
+
+  // Idempotent: publishing an already published product changes nothing.
+  const publish = (productId: string, title: string) => {
+    if (!onlineStore) return;
+    const pub = admin.execute<{
+      publishablePublish: { userErrors: { field: string[] | null; message: string }[] };
+    }>(
+      `mutation($id: ID!, $input: [PublicationInput!]!) {
+         publishablePublish(id: $id, input: $input) { userErrors { field message } } }`,
+      { id: productId, input: [{ publicationId: onlineStore.id }] },
+      { mutation: true },
+    );
+    assertNoUserErrors(`publish ${title}`, pub.publishablePublish.userErrors);
+  };
 
   const variants: Variant[] = [];
   for (const p of PRODUCTS) {
-    const found = existing.find((e) => e.title === p.title)?.variants.nodes[0];
-    if (found) {
-      variants.push({ id: found.id, price: found.price, title: p.title });
+    const found = existing.find((e) => e.title === p.title);
+    const variant = found?.variants.nodes[0];
+    if (found && variant) {
+      publish(found.id, p.title); // earlier runs may have created it without publishing
+      variants.push({ id: variant.id, price: variant.price, title: p.title });
       continue;
     }
     const res = admin.execute<{
@@ -102,17 +127,7 @@ async function ensureProducts(admin: Admin): Promise<Variant[]> {
     );
     assertNoUserErrors(`productSet ${p.title}`, res.productSet.userErrors);
     const product = res.productSet.product!;
-    if (onlineStore) {
-      const pub = admin.execute<{
-        publishablePublish: { userErrors: { field: string[] | null; message: string }[] };
-      }>(
-        `mutation($id: ID!, $input: [PublicationInput!]!) {
-           publishablePublish(id: $id, input: $input) { userErrors { field message } } }`,
-        { id: product.id, input: [{ publicationId: onlineStore.id }] },
-        { mutation: true },
-      );
-      assertNoUserErrors(`publish ${p.title}`, pub.publishablePublish.userErrors);
-    }
+    publish(product.id, p.title);
     variants.push({ id: product.variants.nodes[0]!.id, price: p.price, title: p.title });
     console.log(`  + product ${p.title}`);
   }
@@ -301,6 +316,9 @@ async function main() {
       `{ shop { name currencyCode } }`,
     ).shop;
     console.log(`Store: ${shop.name} (${store}, ${shop.currencyCode})`);
+    console.log(
+      `  (Order Hub formats amounts in the currency set on the Stores page: make it ${shop.currencyCode})`,
+    );
 
     console.log("Products…");
     const variants = await ensureProducts(admin);

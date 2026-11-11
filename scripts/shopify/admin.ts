@@ -55,15 +55,26 @@ export function createAdmin(store: string) {
       "--no-color",
       ...(opts.mutation ? ["--allow-mutations"] : []),
     ];
-    let out: string;
-    try {
-      out = execFileSync(bin, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    } catch (e) {
-      const err = e as { stderr?: string; stdout?: string };
-      throw new Error(
-        `shopify store execute failed:\n${err.stderr || err.stdout || String(e)}\n` +
-          `Did you run: shopify store auth --store ${store} --scopes <scopes> ?`,
-      );
+    let out = "";
+    for (let attempt = 1; ; attempt++) {
+      try {
+        out = execFileSync(bin, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+        break;
+      } catch (e) {
+        const err = e as { stderr?: string; stdout?: string };
+        const detail = err.stderr || err.stdout || String(e);
+        // Loading the stored token occasionally fails transiently (seen in practice). The
+        // operation did not run yet, so retrying is safe even for mutations.
+        if (attempt < 4 && isAuthLoadFailure(detail)) {
+          console.warn(`  … Shopify CLI could not load the stored auth, retrying (${attempt}/3)`);
+          sleepSync(5_000 * attempt);
+          continue;
+        }
+        throw new Error(
+          `shopify store execute failed:\n${detail}\n` +
+            `Did you run: shopify store auth --store ${store} --scopes <scopes> ?`,
+        );
+      }
     }
     // The CLI may print notices before the JSON document: parse from the first "{".
     const json = JSON.parse(out.slice(out.indexOf("{"))) as GraphQLResult<T>;
@@ -84,6 +95,15 @@ export function assertNoUserErrors(
       `${label}: ${errors.map((e) => `${e.field?.join(".") ?? ""} ${e.message}`).join("; ")}`,
     );
   }
+}
+
+/** True when the CLI failed while loading the stored token, i.e. before running the operation. */
+export function isAuthLoadFailure(output: string) {
+  return /"status":"failed"[^\n]*"message":"Loading stored store auth"/.test(output);
+}
+
+function sleepSync(ms: number) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
