@@ -16,10 +16,11 @@
  * Development/trial stores accept at most 5 new orders per minute: the script paces itself.
  */
 import { fakerPT_BR as faker } from "@faker-js/faker";
+import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { centsToPrice, priceToCents } from "../../lib/money";
 import { normalizeShopDomain } from "../../lib/stores/domain";
-import { assertNoUserErrors, createAdmin, sleep, type Admin } from "./admin";
+import { assertNoUserErrors, createAdmin, sleep, sleepSync, type Admin } from "./admin";
 
 const TAG = "order-hub-demo";
 const ONLINE_STORE_NAMES =
@@ -82,7 +83,7 @@ async function ensureProducts(admin: Admin): Promise<Variant[]> {
       `mutation($id: ID!, $input: [PublicationInput!]!) {
          publishablePublish(id: $id, input: $input) { userErrors { field message } } }`,
       { id: productId, input: [{ publicationId: onlineStore.id }] },
-      { mutation: true },
+      { mutation: true, idempotent: true },
     );
     assertNoUserErrors(`publish ${title}`, pub.publishablePublish.userErrors);
   };
@@ -123,7 +124,21 @@ async function ensureProducts(admin: Admin): Promise<Variant[]> {
           ],
         },
       },
-      { mutation: true },
+      {
+        mutation: true,
+        recover: () => {
+          const product = admin.execute<{
+            products: {
+              nodes: { id: string; variants: { nodes: { id: string; price: string }[] } }[];
+            };
+          }>(
+            `query($q: String!) { products(first: 1, query: $q) {
+                 nodes { id variants(first: 1) { nodes { id price } } } } }`,
+            { q: `tag:${TAG} AND title:'${p.title.replace(/'/g, "\\'")}'` },
+          ).products.nodes[0];
+          return product ? { productSet: { product, userErrors: [] } } : null;
+        },
+      },
     );
     assertNoUserErrors(`productSet ${p.title}`, res.productSet.userErrors);
     const product = res.productSet.product!;
@@ -137,6 +152,15 @@ async function ensureProducts(admin: Admin): Promise<Variant[]> {
 
 type Customer = { id: string; email: string };
 
+function findCustomer(admin: Admin, email: string): { id: string } | null {
+  return (
+    admin.execute<{ customers: { nodes: { id: string }[] } }>(
+      `query($q: String!) { customers(first: 1, query: $q) { nodes { id } } }`,
+      { q: `email:${email}` },
+    ).customers.nodes[0] ?? null
+  );
+}
+
 async function ensureCustomers(admin: Admin, count: number): Promise<Customer[]> {
   const out: Customer[] = [];
   for (let i = 0; i < count; i++) {
@@ -146,10 +170,7 @@ async function ensureCustomers(admin: Admin, count: number): Promise<Customer[]>
       .email({ firstName, lastName, provider: "example.com" })
       .toLowerCase();
 
-    const found = admin.execute<{ customers: { nodes: { id: string }[] } }>(
-      `query($q: String!) { customers(first: 1, query: $q) { nodes { id } } }`,
-      { q: `email:${email}` },
-    ).customers.nodes[0];
+    const found = findCustomer(admin, email);
     if (found) {
       out.push({ id: found.id, email });
       continue;
@@ -173,7 +194,13 @@ async function ensureCustomers(admin: Admin, count: number): Promise<Customer[]>
             : { marketingState: "UNSUBSCRIBED" },
         },
       },
-      { mutation: true },
+      {
+        mutation: true,
+        recover: () => {
+          const customer = findCustomer(admin, email);
+          return customer ? { customerCreate: { customer, userErrors: [] } } : null;
+        },
+      },
     );
     assertNoUserErrors(`customerCreate ${email}`, res.customerCreate.userErrors);
     out.push({ id: res.customerCreate.customer!.id, email });
@@ -230,11 +257,13 @@ async function createOrders(
       { weight: 6, value: "PARTIALLY_REFUNDED" },
     ]);
 
+    // A unique tag per order lets us check whether a timed-out orderCreate was applied.
+    const runTag = `${TAG}-${randomUUID().slice(0, 8)}`;
     const order = {
       currency,
       processedAt,
       test: true,
-      tags: [TAG],
+      tags: [TAG, runTag],
       email: customer.email,
       customer: { toAssociate: { id: customer.id } },
       financialStatus: status,
@@ -266,7 +295,21 @@ async function createOrders(
            orderCreate(order: $order, options: $options) {
              order { id name } userErrors { field message } } }`,
         { order, options: { sendReceipt: false, sendFulfillmentReceipt: false } },
-        { mutation: true },
+        {
+          mutation: true,
+          recover: () => {
+            // Order search is eventually consistent: look a few times before declaring "not applied"
+            for (let i = 0; i < 4; i++) {
+              const found = admin.execute<{ orders: { nodes: { id: string; name: string }[] } }>(
+                `query($q: String!) { orders(first: 1, query: $q) { nodes { id name } } }`,
+                { q: `tag:${runTag}` },
+              ).orders.nodes[0];
+              if (found) return { orderCreate: { order: found, userErrors: [] } };
+              sleepSync(5_000);
+            }
+            return null;
+          },
+        },
       ),
     );
     assertNoUserErrors("orderCreate", res.orderCreate.userErrors);
@@ -276,18 +319,34 @@ async function createOrders(
 
     // ~8% of paid orders are cancelled afterwards (orders/cancelled webhook)
     if (status === "PAID" && faker.datatype.boolean(0.08)) {
-      const c = admin.execute<{
-        orderCancel: { orderCancelUserErrors: { field: string[] | null; message: string }[] };
-      }>(
-        `mutation($orderId: ID!) {
+      try {
+        const c = admin.execute<{
+          orderCancel: { orderCancelUserErrors: { field: string[] | null; message: string }[] };
+        }>(
+          `mutation($orderId: ID!) {
            orderCancel(orderId: $orderId, reason: CUSTOMER, restock: true, notifyCustomer: false,
              refundMethod: { originalPaymentMethodsRefund: true }) {
              orderCancelUserErrors { field message } } }`,
-        { orderId: created_.id },
-        { mutation: true },
-      );
-      assertNoUserErrors("orderCancel", c.orderCancel.orderCancelUserErrors);
-      console.log(`    ↳ cancelled ${created_.name}`);
+          { orderId: created_.id },
+          {
+            mutation: true,
+            recover: () => {
+              const o = admin.execute<{ order: { cancelledAt: string | null } | null }>(
+                `query($id: ID!) { order(id: $id) { cancelledAt } }`,
+                { id: created_.id },
+              ).order;
+              return o?.cancelledAt ? { orderCancel: { orderCancelUserErrors: [] } } : null;
+            },
+          },
+        );
+        assertNoUserErrors("orderCancel", c.orderCancel.orderCancelUserErrors);
+        console.log(`    ↳ cancelled ${created_.name}`);
+      } catch (e) {
+        // Not worth stopping the whole run: the order simply stays paid.
+        console.warn(
+          `    ! could not cancel ${created_.name}: ${e instanceof Error ? e.message.split("\n")[0] : e}`,
+        );
+      }
     }
 
     // Development stores: max 5 orders/minute

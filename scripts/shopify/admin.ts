@@ -29,10 +29,18 @@ export function createAdmin(store: string) {
   const dir = mkdtempSync(join(tmpdir(), "order-hub-shopify-"));
   let n = 0;
 
+  /**
+   * Runs one Admin GraphQL operation through the CLI, with retries. The CLI sometimes hangs and
+   * gives up after 30 s (seen in practice), and then we cannot know whether a mutation ran:
+   * - auth-loading failures happen before the operation: always safe to retry;
+   * - queries and `idempotent` mutations are retried;
+   * - other mutations must pass `recover`, which checks on Shopify whether the write happened
+   *   and returns its result (no retry, no duplicate) or null (not applied: retry).
+   */
   function execute<T>(
     query: string,
     variables: unknown = {},
-    opts: { mutation?: boolean } = {},
+    opts: { mutation?: boolean; idempotent?: boolean; recover?: () => T | null } = {},
   ): T {
     const q = join(dir, `q${++n}.graphql`);
     const v = join(dir, `v${n}.json`);
@@ -55,30 +63,41 @@ export function createAdmin(store: string) {
       "--no-color",
       ...(opts.mutation ? ["--allow-mutations"] : []),
     ];
-    let out = "";
+    const ATTEMPTS = 4;
     for (let attempt = 1; ; attempt++) {
+      let detail: string;
       try {
-        out = execFileSync(bin, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-        break;
+        const out = execFileSync(bin, args, {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        // The CLI may print notices before the JSON document: parse from the first "{".
+        return (JSON.parse(out.slice(out.indexOf("{"))) as GraphQLResult<T>).data;
       } catch (e) {
         const err = e as { stderr?: string; stdout?: string };
-        const detail = err.stderr || err.stdout || String(e);
-        // Loading the stored token occasionally fails transiently (seen in practice). The
-        // operation did not run yet, so retrying is safe even for mutations.
-        if (attempt < 4 && isAuthLoadFailure(detail)) {
-          console.warn(`  … Shopify CLI could not load the stored auth, retrying (${attempt}/3)`);
-          sleepSync(5_000 * attempt);
-          continue;
-        }
+        detail = err.stderr || err.stdout || String(e);
+      }
+      if (attempt >= ATTEMPTS) {
         throw new Error(
-          `shopify store execute failed:\n${detail}\n` +
-            `Did you run: shopify store auth --store ${store} --scopes <scopes> ?`,
+          `shopify store execute failed ${ATTEMPTS} times:\n${detail}\n` +
+            `If it is an auth error, run: shopify store auth --store ${store} --scopes <scopes>`,
         );
       }
+      const authOnly = isAuthLoadFailure(detail);
+      if (!authOnly && opts.mutation && !opts.idempotent) {
+        if (!opts.recover) throw new Error(`shopify store execute failed:\n${detail}`);
+        sleepSync(3_000); // give Shopify a moment to make a just-applied write visible
+        const recovered = opts.recover();
+        if (recovered !== null) {
+          console.warn("  … Shopify CLI timed out, but the write was applied: continuing");
+          return recovered;
+        }
+      }
+      console.warn(
+        `  … Shopify CLI ${authOnly ? "could not load the stored auth" : "did not answer"}, retrying (${attempt}/${ATTEMPTS - 1})`,
+      );
+      sleepSync(5_000 * attempt);
     }
-    // The CLI may print notices before the JSON document: parse from the first "{".
-    const json = JSON.parse(out.slice(out.indexOf("{"))) as GraphQLResult<T>;
-    return json.data;
   }
 
   return { execute, dispose: () => rmSync(dir, { recursive: true, force: true }) };
@@ -102,7 +121,7 @@ export function isAuthLoadFailure(output: string) {
   return /"status":"failed"[^\n]*"message":"Loading stored store auth"/.test(output);
 }
 
-function sleepSync(ms: number) {
+export function sleepSync(ms: number) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
