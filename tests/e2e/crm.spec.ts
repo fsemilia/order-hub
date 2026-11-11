@@ -25,6 +25,25 @@ test("customers can be filtered by segment and opened", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
 });
 
+test("orders page lists orders, filters by status and is reachable from the nav", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Recent orders" })).toBeVisible();
+  await page.getByRole("link", { name: "Orders", exact: true }).click();
+  await expect(page).toHaveURL(/\/orders$/);
+  await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  await page.getByLabel("Status").selectOption("refunded");
+  await page.getByRole("button", { name: "Filter" }).click();
+  await expect(page).toHaveURL(/status=refunded/);
+  await expect(page.locator("tbody tr").first()).toBeVisible(); // wait for the streamed table
+  const statuses = await page.locator("tbody td:nth-child(4)").allInnerTexts();
+  expect(statuses.length).toBeGreaterThan(0);
+  for (const s of statuses) expect(s.trim()).toBe("Refunded");
+});
+
 test("search narrows the customer list", async ({ page }) => {
   await page.goto("/customers?q=zzzz-nobody");
   await expect(page.getByText("No customers found")).toBeVisible();

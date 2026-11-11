@@ -8,6 +8,7 @@ import { cn } from "@/components/ui";
 
 const LINKS: { href: string; key: keyof Dictionary["nav"] }[] = [
   { href: "/", key: "overview" },
+  { href: "/orders", key: "orders" },
   { href: "/customers", key: "customers" },
   { href: "/carts", key: "carts" },
   { href: "/agent", key: "agent" },

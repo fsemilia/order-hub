@@ -32,6 +32,7 @@ banco por _tool calling_, sempre entregando rascunhos para revisão humana.
 | **Autenticação**          | Better Auth: e-mail/senha sem cadastro público + GitHub OAuth opcional com allowlist; rate limit no login.                                                                                                                                                                                              |
 | **LGPD**                  | `customers/redact` anonimiza o cliente e mantém só o histórico financeiro anônimo; o LLM nunca recebe e-mail/telefone.                                                                                                                                                                                  |
 | **Multi-loja**            | Dados demo e lojas Shopify reais lado a lado: dados e segredo de webhook por loja (criptografado com AES-256-GCM), seletor de loja no cabeçalho, opção "Dados demo / Loja real" no login, página Lojas para conectar lojas.                                                                             |
+| **Pedidos**               | Feed de pedidos ao vivo (atualiza a cada 15 s) com filtro por status (pago, pendente, reembolsado, cancelado), busca por número do pedido ou cliente, e os últimos pedidos no painel.                                                                                                                   |
 | **Carrinhos abandonados** | Webhooks `checkouts/*`, lista com link de recuperação, KPI de 7 dias no painel, ferramenta do agente para mensagens de recuperação.                                                                                                                                                                     |
 | **Idiomas**               | Interface em inglês (padrão), português e italiano; valores e datas formatados com `Intl` na moeda da loja; o agente responde no idioma da interface.                                                                                                                                                   |
 
@@ -139,7 +140,7 @@ particularidades do `prisma dev` local e outras) estão listadas, cada uma com a
 ```text
 app/
   [locale]/         layout raiz por idioma (en · pt-BR · it); URLs sem prefixo (proxy.ts)
-    (app)/          páginas autenticadas: visão geral, clientes, carrinhos abandonados, agente, lojas
+    (app)/          páginas autenticadas: visão geral, pedidos, clientes, carrinhos abandonados, agente, lojas
     login/
   api/              webhooks Shopify, Better Auth, health check
 lib/
