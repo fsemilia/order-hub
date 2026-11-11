@@ -79,7 +79,7 @@ SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.my
 - I development store accettano **5 nuovi ordini al minuto**: 40 ordini richiedono ~9 minuti.
 - Ordini: `orderCreate` (retrodatato con `processedAt`, qualsiasi stato di pagamento) funziona solo
   con un token **offline**. Il token di `shopify store auth` è online, quindi lo script usa **bozze
-  d'ordine completate come pagate, con data di oggi** (alcune poi annullate con rimborso). Per questo
+  d'ordine completate come pagate, con data di oggi** (Shopify non permette di annullarle, quindi restano tutte pagate; annulla o rimborsa un ordine a mano dall'admin per vedere quegli stati). Per questo
   i clienti risultano nuovi/ricorrenti; il segmento "a rischio" si vede nel negozio demo (limite D7).
 - Limiti: [`limitations.md`](limitations.md), voci D5 e D6.
 

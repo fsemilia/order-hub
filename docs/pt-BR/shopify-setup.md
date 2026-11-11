@@ -79,7 +79,7 @@ SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.my
 - Lojas de desenvolvimento aceitam **5 pedidos novos por minuto**: 40 pedidos levam ~9 minutos.
 - Pedidos: `orderCreate` (retroativo via `processedAt`, qualquer status financeiro) só funciona com
   token **offline**. O token de `shopify store auth` é online, então o script usa **pedidos
-  rascunho concluídos como pagos, com data de hoje** (alguns depois são cancelados com reembolso).
+  rascunho concluídos como pagos, com data de hoje** (a Shopify não permite cancelá-los, então todos ficam pagos; cancele ou reembolse um à mão no admin para ver esses status).
   Por isso os clientes aparecem como novos/recorrentes; o segmento "em risco" aparece na loja demo
   (limitação D7).
 - Limites: [`limitations.md`](limitations.md), itens D5 e D6.

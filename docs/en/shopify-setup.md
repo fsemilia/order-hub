@@ -80,7 +80,7 @@ SHOPIFY_STOREFRONT_PASSWORD='…' npm run shopify:abandon -- --store sitoweb1.my
 - Development stores accept **5 new orders per minute**: 40 orders take ~9 minutes.
 - Orders: `orderCreate` (backdated with `processedAt`, any financial status) only works with an
   **offline** token. The token from `shopify store auth` is online, so the script falls back to
-  **draft orders completed as paid, dated today** (some are then cancelled with a refund). Customers
+  **draft orders completed as paid, dated today** (Shopify does not allow cancelling them, so they all stay paid; cancel or refund one by hand in the admin to see those statuses). Customers
   therefore show up as new/returning; the "at risk" segment is visible in the demo store
   (limitation D7).
 - Limits: [`limitations.md`](limitations.md), items D5 and D6.

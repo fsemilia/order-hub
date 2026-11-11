@@ -180,6 +180,9 @@ async function ensureCustomers(admin: Admin, count: number): Promise<Customer[]>
     const email = faker.internet
       .email({ firstName, lastName, provider: "example.com" })
       .toLowerCase();
+    // Draw every random value BEFORE checking whether the customer exists: the faker sequence
+    // must not depend on the store's state, or a re-run would generate different customers.
+    const subscribed = faker.datatype.boolean(0.7);
 
     const found = findCustomer(admin, email);
     if (found) {
@@ -200,7 +203,7 @@ async function ensureCustomers(admin: Admin, count: number): Promise<Customer[]>
           lastName,
           email,
           tags: [TAG],
-          emailMarketingConsent: faker.datatype.boolean(0.7)
+          emailMarketingConsent: subscribed
             ? { marketingState: "SUBSCRIBED", marketingOptInLevel: "SINGLE_OPT_IN" }
             : { marketingState: "UNSUBSCRIBED" },
         },
@@ -252,7 +255,7 @@ async function createOrders(
   let created = 0;
   // "order": orderCreate (backdated, any financial status) needs an OFFLINE token. A token from
   // `shopify store auth` is online, so we fall back to "draft": draftOrderCreate + draftOrderComplete
-  // (paid, dated today). Cancellations still provide refunded/voided orders.
+  // (paid, dated today; Shopify does not let those be cancelled, so they all stay paid).
   let mode: "order" | "draft" = "order";
   for (const { customer, daysAgo } of plan) {
     const items = faker.helpers.arrayElements(variants, { min: 1, max: 3 }).map((v) => ({
@@ -329,10 +332,10 @@ async function createOrders(
     console.log(`  + order ${created_.name} ${shownStatus} ${amount} ${currency} (${when})`);
 
     // Some paid orders are cancelled with a refund afterwards (orders/cancelled webhook).
-    // In draft mode this is the only source of refunded orders, so it happens more often.
-    const cancelRate = mode === "order" ? 0.08 : 0.15;
+    // Not in draft mode: Shopify refuses to cancel those orders ("pending fulfillments").
+    const cancel = faker.datatype.boolean(0.08); // drawn in both modes: stable faker sequence
     const order_ = created_;
-    if (shownStatus === "PAID" && faker.datatype.boolean(cancelRate)) {
+    if (mode === "order" && shownStatus === "PAID" && cancel) {
       try {
         const c = admin.execute<{
           orderCancel: { orderCancelUserErrors: { field: string[] | null; message: string }[] };
