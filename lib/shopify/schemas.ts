@@ -41,28 +41,41 @@ export const shopifyOrderSchema = z.object({
   processed_at: isoDate.nullish(),
   updated_at: isoDate,
   cancelled_at: isoDate.nullish(),
-  // Links the order to the checkout it completed (marks the abandoned cart as recovered)
+  // Link the order to the checkout it completed (marks the abandoned cart as recovered).
+  // API 2026-10 sends checkout_token; checkout_id only exists in older payloads.
+  checkout_token: z.string().nullish(),
   checkout_id: shopifyId.nullish(),
   customer: shopifyCustomerSchema.nullish(),
   line_items: z.array(shopifyLineItemSchema).default([]),
 });
 
-// checkouts/create, checkouts/update (REST webhook format)
-export const shopifyCheckoutSchema = z.object({
-  id: shopifyId,
-  email: z.string().nullish(),
-  total_price: money,
-  currency: z.string().length(3),
-  created_at: isoDate,
-  updated_at: isoDate,
-  completed_at: isoDate.nullish(),
-  // https only: it is rendered as a link (no javascript:/data: URLs even from a signed payload)
-  abandoned_checkout_url: z.url({ protocol: /^https$/ }).nullish(),
-  customer: shopifyCustomerSchema.nullish(),
-  line_items: z
-    .array(z.object({ title: z.string(), quantity: z.number().int(), price: money.nullish() }))
-    .default([]),
-});
+// checkouts/create, checkouts/update (REST webhook format).
+// API 2026-10 payloads have no top-level `id`: the checkout is identified by `token`, which is
+// also what orders carry as `checkout_token`. `id` is kept as a fallback for older payloads.
+// `key` is what we store as Checkout.shopifyId.
+export const shopifyCheckoutSchema = z
+  .object({
+    // An empty token falls back to the id instead of failing the whole payload
+    token: z
+      .string()
+      .nullish()
+      .transform((t) => t?.trim() || null),
+    id: shopifyId.nullish(),
+    email: z.string().nullish(),
+    total_price: money,
+    currency: z.string().length(3),
+    created_at: isoDate,
+    updated_at: isoDate,
+    completed_at: isoDate.nullish(),
+    // https only: it is rendered as a link (no javascript:/data: URLs even from a signed payload)
+    abandoned_checkout_url: z.url({ protocol: /^https$/ }).nullish(),
+    customer: shopifyCustomerSchema.nullish(),
+    line_items: z
+      .array(z.object({ title: z.string(), quantity: z.number().int(), price: money.nullish() }))
+      .default([]),
+  })
+  .refine((c) => c.token || c.id, { message: "checkout without token or id", path: ["token"] })
+  .transform(({ token, id, ...c }) => ({ ...c, key: (token || id)! }));
 
 export const customersRedactSchema = z.object({
   shop_domain: z.string(),

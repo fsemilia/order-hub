@@ -230,8 +230,10 @@ describe("multi-store", () => {
 });
 
 describe("checkouts/*", () => {
+  // API 2026-10 shape: no top-level id, the checkout is identified by its token
   const baseCheckout = {
-    id: 3500000000001,
+    token: "b1946ac92492d2347c6235b4d2611184",
+    name: "#3500000000001",
     email: "joana.silva@example.com",
     total_price: "239.80",
     currency: "brl",
@@ -246,6 +248,11 @@ describe("checkouts/*", () => {
     ],
   };
   const checkout = () => prisma.checkout.findFirstOrThrow({ where: { storeId } });
+  const withoutToken = (): Record<string, unknown> => {
+    const { token, ...rest } = baseCheckout;
+    void token;
+    return rest;
+  };
 
   it("stores an abandoned checkout linked to the customer", async () => {
     const res = await deliver("checkouts/create", baseCheckout);
@@ -300,10 +307,37 @@ describe("checkouts/*", () => {
     expect(await customer()).toMatchObject({ firstName: "Joana", acceptsMarketing: false });
   });
 
+  it("keys the checkout by its token (API 2026-10 sends no id)", async () => {
+    await deliver("checkouts/create", baseCheckout);
+    expect((await checkout()).shopifyId).toBe(baseCheckout.token);
+  });
+
+  it("prefers the token when a payload has both token and id; empty token falls back to id", async () => {
+    await deliver("checkouts/create", { ...baseCheckout, id: 3500000000001 });
+    expect((await checkout()).shopifyId).toBe(baseCheckout.token);
+    await prisma.checkout.deleteMany();
+    await deliver("checkouts/create", { ...baseCheckout, token: "", id: 3500000000002 });
+    expect((await checkout()).shopifyId).toBe("3500000000002");
+  });
+
   it("the order that completes a checkout marks the cart as recovered", async () => {
     await deliver("checkouts/create", baseCheckout);
-    await deliver("orders/create", order({ checkout_id: baseCheckout.id }));
+    await deliver("orders/create", order({ checkout_token: baseCheckout.token }));
     expect((await checkout()).completedAt).not.toBeNull();
+  });
+
+  it("still accepts older payloads keyed by a numeric id + checkout_id", async () => {
+    await deliver("checkouts/create", { ...withoutToken(), id: 3500000000001 });
+    expect((await checkout()).shopifyId).toBe("3500000000001");
+    await deliver("orders/create", order({ checkout_id: 3500000000001 }));
+    expect((await checkout()).completedAt).not.toBeNull();
+  });
+
+  it("rejects a checkout with neither token nor id (422, nothing written)", async () => {
+    const res = await deliver("checkouts/create", withoutToken());
+    expect(res.status).toBe(422);
+    expect(await prisma.checkout.count()).toBe(0);
+    expect(await prisma.webhookEvent.count()).toBe(0);
   });
 
   it("rejects a non-https recovery URL", async () => {

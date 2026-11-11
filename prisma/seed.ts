@@ -137,7 +137,7 @@ function buildCheckoutPayload(customer: Record<string, unknown>) {
   const totalCents = items.reduce((s, i) => s + Math.round(Number(i.price) * 100) * i.quantity, 0);
   const token = faker.string.alphanumeric(32);
   return {
-    id: faker.string.numeric(14),
+    token,
     email: customer.email,
     total_price: (totalCents / 100).toFixed(2),
     currency: "BRL",
