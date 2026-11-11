@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { isAgentConfigured, remainingQuota } from "@/lib/agent/run";
+import { getAgentKeyStatus } from "@/lib/agent/credentials";
+import { remainingQuota } from "@/lib/agent/run";
 import { getDictionary, isLocale } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
 import { requireStoreContext } from "@/lib/stores/current";
 import { EmptyState, PageHeader, Skeleton } from "@/components/ui";
 import { AgentPanel } from "./agent-panel";
+import { AgentKeyCard } from "./key-form";
 
 export async function generateMetadata({
   params,
@@ -28,17 +30,19 @@ export default async function AgentPage() {
 
 async function Agent() {
   const [{ user, store }, { dict }] = await Promise.all([requireStoreContext(), getI18n()]);
-  if (!isAgentConfigured()) {
-    const [before, after] = dict.agent.notConfiguredHint.split("{key}");
-    return (
-      <EmptyState title={dict.agent.notConfiguredTitle}>
-        {before}
-        <code>ANTHROPIC_API_KEY</code>
-        {after}
-      </EmptyState>
-    );
-  }
-  const quota = await remainingQuota(user.id);
-  // key: switching store resets the panel (an answer about another store must not linger)
-  return <AgentPanel key={store.id} initialQuota={quota} />;
+  const status = await getAgentKeyStatus(user);
+  // The daily quota only guards the operator key; with their own key users are not limited.
+  const quota = status.source === "owner" ? await remainingQuota(user.id) : null;
+  return (
+    <div className="space-y-6">
+      {status.source === "none" ? (
+        <EmptyState title={dict.agent.noKeyTitle}>{dict.agent.noKeyHint}</EmptyState>
+      ) : (
+        // key: switching store resets the panel (an answer about another store must not linger)
+        <AgentPanel key={store.id} initialQuota={quota} />
+      )}
+      {/* key: remount when the stored key changes, so stale form feedback disappears */}
+      <AgentKeyCard key={status.source === "user" ? status.hint : status.source} status={status} />
+    </div>
+  );
 }

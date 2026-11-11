@@ -15,7 +15,8 @@ export const getCurrentUser = cache(async () => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
   const { id, name, email, image } = session.user;
-  return { id, name, email, image };
+  // sessionId scopes per-session data on shared logins (the demo user's agent key).
+  return { id, name, email, image, sessionId: session.session.id };
 });
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;

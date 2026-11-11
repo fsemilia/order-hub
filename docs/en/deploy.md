@@ -17,16 +17,17 @@
 1. https://vercel.com/new → import the GitHub repository.
 2. **Environment Variables** (Production and Preview):
 
-   | Variable                                                     | Value                                                      |
-   | ------------------------------------------------------------ | ---------------------------------------------------------- |
-   | `DATABASE_URL`                                               | transaction pooler (6543)                                  |
-   | `DIRECT_URL`                                                 | session pooler / direct (5432)                             |
-   | `BETTER_AUTH_SECRET`                                         | `openssl rand -base64 32`                                  |
-   | `BETTER_AUTH_URL`                                            | `https://<your-project>.vercel.app`                        |
-   | `STORE_SECRETS_KEY`                                          | `openssl rand -base64 32` (encrypts store webhook secrets) |
-   | `ANTHROPIC_API_KEY`                                          | optional (enables the agent)                               |
-   | `ALLOWED_EMAILS`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional                                                   |
-   | `DEMO_EMAIL`, `DEMO_PASSWORD`                                | demo user created by the seed                              |
+   | Variable                                                     | Value                                                                                       |
+   | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+   | `DATABASE_URL`                                               | transaction pooler (6543)                                                                   |
+   | `DIRECT_URL`                                                 | session pooler / direct (5432)                                                              |
+   | `BETTER_AUTH_SECRET`                                         | `openssl rand -base64 32`                                                                   |
+   | `BETTER_AUTH_URL`                                            | `https://<your-project>.vercel.app`                                                         |
+   | `STORE_SECRETS_KEY`                                          | `openssl rand -base64 32` (encrypts store webhook secrets)                                  |
+   | `ANTHROPIC_API_KEY`                                          | optional: operator key, used only by `AGENT_OWNER_EMAILS` (other users bring their own key) |
+   | `AGENT_OWNER_EMAILS`                                         | optional, comma-separated emails allowed to use `ANTHROPIC_API_KEY`                         |
+   | `ALLOWED_EMAILS`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | optional                                                                                    |
+   | `DEMO_EMAIL`, `DEMO_PASSWORD`                                | demo user created by the seed                                                               |
 
 3. Deploy. The `buildCommand` is `npm run vercel-build` = `prisma migrate deploy && next build`:
    migrations are applied before the build; if they fail, the deploy fails and the previous

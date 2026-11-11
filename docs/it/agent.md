@@ -41,18 +41,30 @@ Tutti riusano `lib/crm/queries.ts`, che ha test di integrazione.
 - **I dati del negozio sono dati**: nomi e titoli dei prodotti possono contenere testo malevolo
   (prompt injection); il prompt dice al modello di trattarli come dati, e i tool non permettono
   azioni pericolose anche se obbedisse.
-- **Costo controllato**: quota (`AGENT_DAILY_LIMIT` su 24 h mobili), iterazioni limitate, prompt
-  statico (cacheabile) e token registrati per ogni esecuzione.
+- **Chiave propria (bring your own key)**: ogni utente salva la propria chiave API Anthropic nella
+  pagina dell'agente (cifrata AES-256-GCM in `agent_credentials`, mai restituita né scritta nei
+  log; la UI mostra solo gli ultimi 4 caratteri). La chiave del server `ANTHROPIC_API_KEY` è usata
+  **solo** dalle email in `AGENT_OWNER_EMAILS`, e solo se non hanno una chiave propria; tutti gli
+  altri, utente demo compreso, devono inserire la loro. Una chiave rifiutata da Anthropic (401/403)
+  mostra un messaggio specifico.
+- **Account demo condiviso**: il login demo (`DEMO_EMAIL`) è usato da più persone, quindi la sua
+  chiave è legata alla _sessione_ (`agent_credentials.sessionId`, cascade): viene cancellata
+  all'uscita, e un altro visitatore entrato con lo stesso account non la vede né la usa. L'account
+  demo non riceve mai la chiave del gestore, anche se è in `AGENT_OWNER_EMAILS`. Una
+  `ANTHROPIC_API_KEY` malformata viene ignorata (log `env.invalid_anthropic_key`): disattiva
+  l'agente per i proprietari, nient'altro.
+- **Costo controllato**: quota sulla chiave del gestore (`AGENT_DAILY_LIMIT` su 24 h mobili; chi usa la propria chiave non ha limiti), iterazioni limitate, prompt statico (cacheabile) e token registrati per ogni esecuzione.
 - **Rifiuti**: fallback lato server in caso di rifiuto (`fallbacks: "default"`) e gestione
   esplicita di `stop_reason: "refusal"` con un messaggio chiaro.
 
 ## Configurazione
 
-| Variabile           | Default                                             |
-| ------------------- | --------------------------------------------------- |
-| `ANTHROPIC_API_KEY` | — (senza chiave la pagina mostra "non configurato") |
-| `ANTHROPIC_MODEL`   | `claude-opus-5-5`                                   |
-| `AGENT_DAILY_LIMIT` | `20`                                                |
+| Variabile            | Default                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`  | — (chiave del gestore, usata solo da `AGENT_OWNER_EMAILS`)         |
+| `AGENT_OWNER_EMAILS` | — (separate da virgola; vuoto = nessuno usa la chiave del gestore) |
+| `ANTHROPIC_MODEL`    | `claude-opus-5-5`                                                  |
+| `AGENT_DAILY_LIMIT`  | `20`                                                               |
 
 ## Audit
 

@@ -41,18 +41,28 @@ All of them reuse `lib/crm/queries.ts`, which has integration tests.
 - **Store data is data**: names and product titles may contain malicious text (prompt
   injection); the prompt tells the model to treat them as data, and the tools allow no dangerous
   action even if it complied.
-- **Controlled cost**: quota (`AGENT_DAILY_LIMIT` per rolling 24 h), bounded iterations, static
-  (cacheable) prompt and tokens recorded per run.
+- **Bring your own key**: each user saves their own Anthropic API key on the agent page
+  (AES-256-GCM encrypted in `agent_credentials`, never returned or logged; the UI shows only the
+  last 4 characters). The server key `ANTHROPIC_API_KEY` is used **only** by the emails in
+  `AGENT_OWNER_EMAILS`, and only when they have no key of their own; everyone else, the demo user
+  included, must bring a key. A key rejected by Anthropic (401/403) gets a specific message.
+- **Shared demo account**: the demo login (`DEMO_EMAIL`) is used by several people, so its key is
+  bound to the _session_ (`agent_credentials.sessionId`, cascade): it is deleted at sign-out, and
+  another visitor signed in to the same account never sees or uses it. The demo account never gets
+  the operator key, even if listed in `AGENT_OWNER_EMAILS`. A malformed `ANTHROPIC_API_KEY` is
+  ignored (logged as `env.invalid_anthropic_key`): it disables the agent for owners, nothing else.
+- **Controlled cost**: quota on the operator key (`AGENT_DAILY_LIMIT` per rolling 24 h; users on their own key are not limited), bounded iterations, static (cacheable) prompt and tokens recorded per run.
 - **Refusals**: server-side refusal fallback (`fallbacks: "default"`) and explicit handling of
   `stop_reason: "refusal"` with a clear message.
 
 ## Configuration
 
-| Variable            | Default                                            |
-| ------------------- | -------------------------------------------------- |
-| `ANTHROPIC_API_KEY` | — (without a key, the page shows "not configured") |
-| `ANTHROPIC_MODEL`   | `claude-opus-5-5`                                  |
-| `AGENT_DAILY_LIMIT` | `20`                                               |
+| Variable             | Default                                                   |
+| -------------------- | --------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`  | — (operator key, used only by `AGENT_OWNER_EMAILS`)       |
+| `AGENT_OWNER_EMAILS` | — (comma-separated; empty = nobody uses the operator key) |
+| `ANTHROPIC_MODEL`    | `claude-opus-5-5`                                         |
+| `AGENT_DAILY_LIMIT`  | `20`                                                      |
 
 ## Audit
 
