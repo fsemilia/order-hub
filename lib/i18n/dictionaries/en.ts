@@ -182,8 +182,9 @@ const en = {
     title: "Retention agent",
     description:
       "Ask in natural language. The agent queries this store's data through read-only tools and returns drafts for you to review.",
-    notConfiguredTitle: "Agent not configured",
-    notConfiguredHint: "Set {key} in the environment variables to enable the agent.",
+    noKeyTitle: "Add your Anthropic API key",
+    noKeyHint:
+      "The agent runs on your own Anthropic account: paste an API key below to start asking questions.",
     question: "Your question",
     placeholder: "E.g.: Which customers are at risk? Write a win-back email.",
     remaining: {
@@ -209,11 +210,32 @@ const en = {
       get_customer_profile: "Customer profile",
       list_abandoned_checkouts: "Abandoned carts",
     } as Record<string, string>,
+    key: {
+      title: "Anthropic API key",
+      label: "Your Anthropic API key",
+      usingOwn: "The agent uses your key ending in …{hint}.",
+      usingOwner:
+        "The agent uses the server key (owner account). You can add your own key to use it instead.",
+      missing: "No key yet: the agent uses your own Anthropic account, never someone else's.",
+      sharedAccount:
+        "This is a shared demo account: your key is kept only for this session and is deleted when you sign out.",
+      save: "Save key",
+      replace: "Replace key",
+      remove: "Remove key",
+      saved: "Key saved.",
+      invalid: "This does not look like an Anthropic API key (it starts with sk-ant-).",
+      privacy:
+        "The key is stored encrypted, is only used for your questions and is never shown again. Usage is billed to your Anthropic account.",
+      getKey: "Create a key in the Anthropic Console",
+    },
     errors: {
       tooShort: "Question too short.",
       tooLong: "Question too long.",
       invalid: "Invalid question.",
-      notConfigured: "Agent not configured (ANTHROPIC_API_KEY).",
+      noKey: "Add your Anthropic API key to use the agent.",
+      keyUnreadable: "Your saved API key can no longer be read. Enter it again below.",
+      keyRejected: "Anthropic rejected your API key. Check it or replace it below.",
+      ownerKeyRejected: "Anthropic rejected the server API key (ANTHROPIC_API_KEY).",
       quota: "Question limit for the last 24 hours reached. Try again later.",
       refusal: "The model could not answer this question. Rephrase it around the store's data.",
       tooLongAnalysis: "The analysis got too long. Try a more specific question.",

@@ -37,6 +37,8 @@ export const auth = betterAuth({
     GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET
       ? { github: { clientId: GITHUB_CLIENT_ID, clientSecret: GITHUB_CLIENT_SECRET } }
       : undefined,
+  // Do not enable `user.changeEmail`: AGENT_OWNER_EMAILS grants the operator's Anthropic key by
+  // email (lib/agent/credentials.ts), so emails must stay immutable for users.
   user: {
     validateUserInfo: ({ user, source }) => {
       if (source.method !== "oauth") return;

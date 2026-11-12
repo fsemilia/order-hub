@@ -181,8 +181,9 @@ const it: Dictionary = {
     title: "Agente di retention",
     description:
       "Chiedi in linguaggio naturale. L'agente interroga i dati di questo negozio con strumenti in sola lettura e restituisce bozze da rivedere.",
-    notConfiguredTitle: "Agente non configurato",
-    notConfiguredHint: "Imposta {key} nelle variabili d'ambiente per abilitare l'agente.",
+    noKeyTitle: "Aggiungi la tua chiave API Anthropic",
+    noKeyHint:
+      "L'agente usa il tuo account Anthropic: incolla qui sotto una chiave API per iniziare a fare domande.",
     question: "La tua domanda",
     placeholder: "Es.: Quali clienti sono a rischio? Scrivi un'email di riattivazione.",
     remaining: {
@@ -208,11 +209,34 @@ const it: Dictionary = {
       get_customer_profile: "Profilo cliente",
       list_abandoned_checkouts: "Carrelli abbandonati",
     },
+    key: {
+      title: "Chiave API Anthropic",
+      label: "La tua chiave API Anthropic",
+      usingOwn: "L'agente usa la tua chiave che termina con …{hint}.",
+      usingOwner:
+        "L'agente usa la chiave del server (account del proprietario). Puoi aggiungere la tua chiave per usare quella.",
+      missing:
+        "Nessuna chiave: l'agente usa il tuo account Anthropic, mai quello di qualcun altro.",
+      sharedAccount:
+        "Questo è un account demo condiviso: la tua chiave resta solo per questa sessione e viene cancellata quando esci.",
+      save: "Salva chiave",
+      replace: "Sostituisci chiave",
+      remove: "Rimuovi chiave",
+      saved: "Chiave salvata.",
+      invalid: "Non sembra una chiave API Anthropic (inizia con sk-ant-).",
+      privacy:
+        "La chiave è salvata cifrata, serve solo per le tue domande e non viene più mostrata. L'uso viene addebitato sul tuo account Anthropic.",
+      getKey: "Crea una chiave nella Console Anthropic",
+    },
     errors: {
       tooShort: "Domanda troppo corta.",
       tooLong: "Domanda troppo lunga.",
       invalid: "Domanda non valida.",
-      notConfigured: "Agente non configurato (ANTHROPIC_API_KEY).",
+      noKey: "Aggiungi la tua chiave API Anthropic per usare l'agente.",
+      keyUnreadable: "La chiave API salvata non è più leggibile. Inseriscila di nuovo qui sotto.",
+      keyRejected:
+        "Anthropic ha rifiutato la tua chiave API. Controllala o sostituiscila qui sotto.",
+      ownerKeyRejected: "Anthropic ha rifiutato la chiave API del server (ANTHROPIC_API_KEY).",
       quota: "Limite di domande delle ultime 24 ore raggiunto. Riprova più tardi.",
       refusal: "Il modello non può rispondere a questa domanda. Riformulala sui dati del negozio.",
       tooLongAnalysis: "L'analisi è diventata troppo lunga. Prova una domanda più specifica.",

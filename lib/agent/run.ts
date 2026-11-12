@@ -7,11 +7,19 @@ import { logger } from "@/lib/logger";
 import { DAY_MS } from "@/lib/crm/segments";
 import { getDictionary, t, type Locale } from "@/lib/i18n";
 import type { StoreSummary } from "@/lib/stores/stores";
+import { resolveAgentKey, type KeyOwner } from "./credentials";
 import { languageInstruction, SYSTEM_PROMPT } from "./prompt";
 import { createAgentTools, type ToolCallTrace } from "./tools";
 
 export type AgentResult =
-  | { ok: true; runId: string; answer: string; toolCalls: ToolCallTrace[]; durationMs: number }
+  | {
+      ok: true;
+      runId: string;
+      answer: string;
+      toolCalls: ToolCallTrace[];
+      durationMs: number;
+      quotaApplies: boolean;
+    }
   | { ok: false; error: string };
 
 const MAX_ITERATIONS = 6;
@@ -19,19 +27,13 @@ const MAX_ITERATIONS = 6;
 // Tool inputs were parsed from JSON by the SDK, so the trace is JSON-safe by construction.
 const asJson = (trace: ToolCallTrace[]) => trace as unknown as Prisma.InputJsonValue;
 
-let client: Anthropic | undefined;
-function getClient() {
-  client ??= new Anthropic({ apiKey: env().ANTHROPIC_API_KEY, maxRetries: 2, timeout: 90_000 });
-  return client;
-}
-
-export function isAgentConfigured() {
-  return Boolean(env().ANTHROPIC_API_KEY);
-}
+// One client per run: the key depends on the user (bring your own key, see ./credentials).
+const createClient = (apiKey: string) => new Anthropic({ apiKey, maxRetries: 2, timeout: 90_000 });
 
 export async function remainingQuota(userId: string, now = new Date()) {
   const used = await prisma.agentRun.count({
-    where: { userId, createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
+    // Only runs paid by the operator count: the quota guards the operator's key.
+    where: { userId, keySource: "owner", createdAt: { gte: new Date(now.getTime() - DAY_MS) } },
   });
   return Math.max(0, env().AGENT_DAILY_LIMIT - used);
 }
@@ -45,21 +47,29 @@ export async function remainingQuota(userId: string, now = new Date()) {
  */
 export async function runAgent(
   question: string,
-  { userId, store, locale }: { userId: string; store: StoreSummary; locale: Locale },
+  { user, store, locale }: { user: KeyOwner; store: StoreSummary; locale: Locale },
 ): Promise<AgentResult> {
   const errors = getDictionary(locale).agent.errors;
-  if (!isAgentConfigured()) return { ok: false, error: errors.notConfigured };
-  // The quota is per user across stores: it is a cost guard, not a per-store feature.
-  if ((await remainingQuota(userId)) <= 0) return { ok: false, error: errors.quota };
+  const key = await resolveAgentKey(user);
+  if (!key.ok)
+    return { ok: false, error: key.reason === "unreadable" ? errors.keyUnreadable : errors.noKey };
+  const userId = user.id;
+  // The quota guards the operator's money: it applies only when the operator key is used. With
+  // their own key a user pays for themselves (and demo visitors do not drain each other's quota).
+  if (key.source === "owner" && (await remainingQuota(userId)) <= 0) {
+    return { ok: false, error: errors.quota };
+  }
 
-  const run = await prisma.agentRun.create({ data: { userId, storeId: store.id, question } });
+  const run = await prisma.agentRun.create({
+    data: { userId, storeId: store.id, question, keySource: key.source },
+  });
   const trace: ToolCallTrace[] = [];
   const start = Date.now();
   let inputTokens = 0;
   let outputTokens = 0;
 
   try {
-    const runner = getClient().beta.messages.toolRunner({
+    const runner = createClient(key.apiKey).beta.messages.toolRunner({
       model: env().ANTHROPIC_MODEL,
       max_tokens: 16000,
       output_config: { effort: "medium" },
@@ -100,20 +110,32 @@ export async function runAgent(
     });
     logger.info("agent.run", {
       runId: run.id,
+      keySource: key.source,
       storeId: store.id,
       durationMs,
       inputTokens,
       outputTokens,
       tools: trace.length,
     });
-    return { ok: true, runId: run.id, answer, toolCalls: trace, durationMs };
+    return {
+      ok: true,
+      runId: run.id,
+      answer,
+      toolCalls: trace,
+      durationMs,
+      quotaApplies: key.source === "owner",
+    };
   } catch (e) {
     const message =
-      e instanceof Anthropic.RateLimitError
-        ? errors.rateLimited
-        : e instanceof Anthropic.APIError
-          ? t(errors.api, { status: e.status ?? "network" })
-          : errors.unexpected;
+      e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError
+        ? key.source === "user"
+          ? errors.keyRejected
+          : errors.ownerKeyRejected
+        : e instanceof Anthropic.RateLimitError
+          ? errors.rateLimited
+          : e instanceof Anthropic.APIError
+            ? t(errors.api, { status: e.status ?? "network" })
+            : errors.unexpected;
     await prisma.agentRun.update({
       where: { id: run.id },
       data: { error: String(e), toolCalls: asJson(trace), durationMs: Date.now() - start },

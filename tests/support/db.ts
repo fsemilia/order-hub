@@ -4,7 +4,7 @@ import { createShopifyStore } from "@/lib/stores/stores";
 export async function resetDb() {
   // Stores cascade to customers, orders, line items, checkouts and webhook events.
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "stores", "order_line_items", "orders", "customers", "checkouts", "webhook_events", "agent_runs" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "stores", "order_line_items", "orders", "customers", "checkouts", "webhook_events", "agent_runs", "agent_credentials" RESTART IDENTITY CASCADE',
   );
 }
 

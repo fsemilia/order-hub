@@ -16,16 +16,17 @@
 1. https://vercel.com/new → importe o repositório do GitHub.
 2. **Environment Variables** (Production e Preview):
 
-   | Variável                                                     | Valor                                                         |
-   | ------------------------------------------------------------ | ------------------------------------------------------------- |
-   | `DATABASE_URL`                                               | transaction pooler (6543)                                     |
-   | `DIRECT_URL`                                                 | session pooler / direta (5432)                                |
-   | `BETTER_AUTH_SECRET`                                         | `openssl rand -base64 32`                                     |
-   | `BETTER_AUTH_URL`                                            | `https://<seu-projeto>.vercel.app`                            |
-   | `STORE_SECRETS_KEY`                                          | `openssl rand -base64 32` (criptografa os segredos das lojas) |
-   | `ANTHROPIC_API_KEY`                                          | opcional (habilita o agente)                                  |
-   | `ALLOWED_EMAILS`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | opcionais                                                     |
-   | `DEMO_EMAIL`, `DEMO_PASSWORD`                                | usuário demo criado pelo seed                                 |
+   | Variável                                                     | Valor                                                                                              |
+   | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+   | `DATABASE_URL`                                               | transaction pooler (6543)                                                                          |
+   | `DIRECT_URL`                                                 | session pooler / direta (5432)                                                                     |
+   | `BETTER_AUTH_SECRET`                                         | `openssl rand -base64 32`                                                                          |
+   | `BETTER_AUTH_URL`                                            | `https://<seu-projeto>.vercel.app`                                                                 |
+   | `STORE_SECRETS_KEY`                                          | `openssl rand -base64 32` (criptografa os segredos das lojas)                                      |
+   | `ANTHROPIC_API_KEY`                                          | opcional: chave do operador, usada só por `AGENT_OWNER_EMAILS` (os outros usuários usam a própria) |
+   | `AGENT_OWNER_EMAILS`                                         | opcional, e-mails separados por vírgula que podem usar `ANTHROPIC_API_KEY`                         |
+   | `ALLOWED_EMAILS`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | opcionais                                                                                          |
+   | `DEMO_EMAIL`, `DEMO_PASSWORD`                                | usuário demo criado pelo seed                                                                      |
 
 3. Deploy. O `buildCommand` é `npm run vercel-build` = `prisma migrate deploy && next build`:
    as migrações são aplicadas antes do build; se falharem, o deploy falha e a versão anterior

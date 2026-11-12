@@ -44,6 +44,10 @@ export default defineConfig({
             DATABASE_URL: testDbUrl,
             DIRECT_URL: testDbUrl,
             DATABASE_POOL_MAX: "1",
+            // Operator key + owner list: tests assert non-owners can never use this key
+            ANTHROPIC_API_KEY: "sk-ant-test-operator-key-0000000000",
+            AGENT_OWNER_EMAILS: "owner@example.com",
+            DEMO_EMAIL: "demo@example.com",
           },
           globalSetup: ["tests/support/global-setup.ts"],
           // One shared database: run files serially.

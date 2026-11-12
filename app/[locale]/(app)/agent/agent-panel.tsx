@@ -6,13 +6,19 @@ import { buttonStyles, Card, inputStyles } from "@/components/ui";
 import { plural } from "@/lib/i18n";
 import { askAgent, type AskState } from "./actions";
 
-export function AgentPanel({ initialQuota }: { initialQuota: number }) {
+/** `initialQuota` is null when no quota applies (the user runs the agent on their own key). */
+export function AgentPanel({ initialQuota }: { initialQuota: number | null }) {
   const { locale, dict } = useI18n();
   const a = dict.agent;
   const [state, formAction, pending] = useActionState<AskState, FormData>(askAgent, null);
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const quota = state?.ok ? initialQuota - 1 : initialQuota;
+  const quota =
+    initialQuota === null
+      ? null
+      : state?.ok && state.quotaApplies
+        ? initialQuota - 1
+        : initialQuota;
 
   return (
     <div className="space-y-6">
@@ -48,9 +54,13 @@ export function AgentPanel({ initialQuota }: { initialQuota: number }) {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-zinc-500">
-              {plural(a.remaining, Math.max(0, quota), locale)}
+              {quota !== null && plural(a.remaining, Math.max(0, quota), locale)}
             </span>
-            <button type="submit" disabled={pending || quota <= 0} className={buttonStyles.primary}>
+            <button
+              type="submit"
+              disabled={pending || (quota !== null && quota <= 0)}
+              className={buttonStyles.primary}
+            >
               {pending ? a.asking : a.ask}
             </button>
           </div>
