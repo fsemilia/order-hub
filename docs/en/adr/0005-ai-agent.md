@@ -18,6 +18,8 @@ and cost.
 - Minimization: the model receives first name and internal id, never contact details.
 - Output is always an editable draft; nothing is sent automatically.
 - Per-user quota, bounded iterations, audit log in `agent_runs`.
+- **Update 2026-11-11 (#26):** each user brings their own Anthropic API key (stored encrypted);
+  the server key is used only by `AGENT_OWNER_EMAILS`, and the quota applies only to it.
 - Server-side refusal fallback and explicit handling of `refusal`.
 
 ## Consequences
@@ -25,4 +27,4 @@ and cost.
 - (+) Even a successful prompt injection has no dangerous tool to use.
 - (+) Cost and behavior observable per run.
 - (−) To send the campaign, a human copies the draft — intentional at this stage.
-- (−) No automated evals yet: see [limitations.md](../limitations.md), items G1–G5.
+- (−) No automated evals yet: see [limitations.md](../limitations.md), items G1–G6.

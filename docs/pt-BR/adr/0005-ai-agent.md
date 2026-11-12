@@ -18,6 +18,8 @@ loja e custo.
 - Minimização: o modelo recebe primeiro nome e id interno, nunca contato.
 - Saída sempre como rascunho editável; nada é enviado automaticamente.
 - Limite diário por usuário, máximo de iterações, auditoria em `agent_runs`.
+- **Atualização 2026-11-11 (#26):** cada usuário usa a própria chave da API Anthropic (salva
+  criptografada); a chave do servidor é usada só por `AGENT_OWNER_EMAILS`, e a cota vale só para ela.
 - Fallback de recusa no servidor e tratamento explícito de `refusal`.
 
 ## Consequências
@@ -25,4 +27,4 @@ loja e custo.
 - (+) Mesmo um prompt injection bem-sucedido não tem ferramenta perigosa para usar.
 - (+) Custos e comportamento observáveis por execução.
 - (−) Para enviar a campanha, um humano copia o rascunho — intencional nesta fase.
-- (−) Ainda sem avaliação automatizada: ver [limitations.md](../limitations.md), itens G1–G5.
+- (−) Ainda sem avaliação automatizada: ver [limitations.md](../limitations.md), itens G1–G6.

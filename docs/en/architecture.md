@@ -55,7 +55,9 @@ processing) are in [`limitations.md`](limitations.md), items R1–R2.
   `firstOrderAt`, `lastOrderAt`) with indexes on `lastOrderAt` and `totalSpent`.
 - `orders`, `order_line_items` — orders and items; `totalPrice` as `Decimal(12,2)`.
 - `webhook_events` — idempotency log.
-- `agent_runs` — agent audit log (question, answer, tools, tokens, latency).
+- `agent_runs` — agent audit log (question, answer, tools, tokens, latency, key source).
+- `agent_credentials` — users' own Anthropic keys, encrypted (AES-256-GCM); a key saved by the
+  shared demo user is bound to its session and deleted at sign-out.
 - `user`, `session`, `account`, `verification` — Better Auth.
 
 The **segment** is not stored because it depends on the current date. The rule lives in

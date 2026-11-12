@@ -5,6 +5,31 @@ All notable changes to Order Hub are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Commits follow
 [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Retention agent — bring your own key** (#26): each user saves their own Anthropic API key on
+  the agent page, stored AES-256-GCM encrypted in the new `agent_credentials` table, never
+  returned or logged (the UI shows only the last 4 characters). The server key
+  `ANTHROPIC_API_KEY` is used only by the emails in the new `AGENT_OWNER_EMAILS`, and only when
+  they have no key of their own. The shared demo account's key is bound to its session and
+  deleted at sign-out; the demo account never gets the server key.
+
+### Changed
+
+- The daily agent quota counts only runs made with the server key (new `agent_runs.keySource`).
+- A malformed `ANTHROPIC_API_KEY` disables the agent for owners only; login and webhooks keep
+  working.
+
+### Fixed
+
+- The language switcher, store switcher, login data-source toggle and login buttons are
+  disabled until the page hydrates, so a choice made on a slow connection is no longer lost
+  (#27).
+- Local Playwright runs are stable: no `networkidle` waits, sign-in retries while `next dev`
+  compiles, routes warmed before the parallel tests (#27).
+
 ## [1.0.0] — 2026-11-11
 
 First stable release, live at <https://order-hub-lime.vercel.app>.
@@ -52,4 +77,5 @@ First stable release, live at <https://order-hub-lime.vercel.app>.
 - Trilingual documentation (en, pt-BR, it): architecture, ADRs, Shopify setup, deploy, agent and
   a list of known limitations.
 
+[Unreleased]: https://github.com/fsemilia/order-hub/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/fsemilia/order-hub/releases/tag/v1.0.0
