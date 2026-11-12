@@ -55,7 +55,9 @@ estão em [`limitations.md`](limitations.md), itens R1–R2.
   `firstOrderAt`, `lastOrderAt`) com índices em `lastOrderAt` e `totalSpent`.
 - `orders`, `order_line_items` — pedidos e itens; `totalPrice` em `Decimal(12,2)`.
 - `webhook_events` — log de idempotência.
-- `agent_runs` — auditoria do agente (pergunta, resposta, ferramentas, tokens, latência).
+- `agent_runs` — auditoria do agente (pergunta, resposta, ferramentas, tokens, latência, origem da chave).
+- `agent_credentials` — chaves Anthropic próprias dos usuários, criptografadas (AES-256-GCM); a chave
+  salva pelo usuário demo compartilhado fica vinculada à sessão e é apagada no logout.
 - `user`, `session`, `account`, `verification` — Better Auth.
 
 O **segmento** não é armazenado porque depende da data atual. A regra está em
