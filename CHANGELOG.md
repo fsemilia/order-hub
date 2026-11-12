@@ -30,6 +30,12 @@ All notable changes to Order Hub are documented here. The format follows
 - Local Playwright runs are stable: no `networkidle` waits, sign-in retries while `next dev`
   compiles, routes warmed before the parallel tests (#27).
 
+### Security
+
+- `minimatch` forced to `^11.0.1` under `@typescript-eslint/typescript-estree` with an npm
+  override (GHSA-g3hv-75wg-m249, DoS via glob pattern amplification). Development-only
+  dependency used by the linter; the vulnerable code path was not reachable.
+
 ## [1.0.0] — 2026-11-11
 
 First stable release, live at <https://order-hub-lime.vercel.app>.
